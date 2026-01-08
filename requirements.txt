@@ -1,4 +1,7 @@
-# Minimal dependencies for local testing and optional FastAPI usage
+# Minimal dependencies for Vercel deployment
 fastapi>=0.100.0
 uvicorn>=0.23.0
 mcp
+
+# Pin a recent requests/httpx if you need it
+httpx>=0.28.0
