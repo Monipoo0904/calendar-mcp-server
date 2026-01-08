@@ -4,6 +4,8 @@ const messages = document.getElementById('messages');
 const spinner = document.getElementById('spinner');
 const sendBtn = document.getElementById('sendBtn');
 const clearBtn = document.getElementById('clearBtn');
+const clearBtnTop = document.getElementById('clearBtnTop');
+const themeToggle = document.getElementById('themeToggle');
 
 let chat = [] // persisted messages
 let typingEl = null
@@ -24,6 +26,20 @@ function load() {
   }
 }
 
+// Theme
+function setTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('ui_theme', t);
+  themeToggle.textContent = t === 'dark' ? '☀️' : '🌙';
+}
+
+function loadTheme(){
+  const t = localStorage.getItem('ui_theme') || 'dark';
+  setTheme(t);
+}
+
+loadTheme();
+
 function escapeHtml(str){
   return str.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
 }
@@ -34,7 +50,7 @@ function formatTime(ts){
 
 function renderMessage(msg){
   const el = document.createElement('div');
-  el.className = 'message ' + (msg.who === 'user' ? 'user' : 'bot');
+  el.className = 'message ' + (msg.who === 'user' ? 'user' : 'bot') + ' enter';
   el.innerHTML = `
     <div class="avatar">${msg.who === 'user' ? '🧑' : '🤖'}</div>
     <div class="bubble">
@@ -46,6 +62,8 @@ function renderMessage(msg){
     </div>
   `;
   messages.appendChild(el);
+  // trigger enter animation
+  requestAnimationFrame(()=> el.classList.remove('enter'));
   messages.scrollTop = messages.scrollHeight;
 }
 
@@ -103,6 +121,12 @@ if (chat.length){
   addLocalMessage('Welcome! Try commands: list, summarize, add:Title|YYYY-MM-DD|Desc, delete:Title', 'bot');
 }
 
+// accessibility: focus input on load
+window.addEventListener('load', ()=> input.focus());
+
+// Keep theme set when page loads
+loadTheme();
+
 // Event delegation for copy buttons
 messages.addEventListener('click', (e) => {
   const btn = e.target.closest('.copy');
@@ -119,12 +143,20 @@ messages.addEventListener('click', (e) => {
 });
 
 // Clear conversation
-clearBtn?.addEventListener('click', (e)=>{
+function clearConversation(){
   if (!confirm('Clear conversation?')) return;
   chat = [];
   save();
   messages.innerHTML = '';
   addLocalMessage('Conversation cleared.');
+}
+clearBtn?.addEventListener('click', clearConversation);
+clearBtnTop?.addEventListener('click', clearConversation);
+
+// Theme toggle
+themeToggle?.addEventListener('click', ()=>{
+  const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+  setTheme(cur === 'dark' ? 'light' : 'dark');
 });
 
 // Keyboard: Enter to send, Shift+Enter for newline

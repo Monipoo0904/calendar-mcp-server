@@ -1,24 +1,36 @@
-:root{--bg:#0f1720;--card:#0b1220;--muted:#aab2bd;--accent:#3ddc84}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+:root{--bg:#071023;--card:#071429;--muted:#9fb0c1;--accent:#3ddc84;--glass:rgba(255,255,255,0.03);--bubble-grad:linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01));--send:#3ddc84}
 *{box-sizing:border-box}
-body{margin:0;font-family:Inter,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#071022,#081123);color:#e6eef5;min-height:100vh;display:grid;place-items:center}
-.chat{width:min(820px,96%);background:var(--card);border-radius:10px;padding:20px;box-shadow:0 6px 24px rgba(2,6,23,0.7)}
-.messages{height:340px;overflow:auto;padding:10px;border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);margin-bottom:12px;display:flex;flex-direction:column}
-.message{display:flex;gap:10px;align-items:flex-end;margin-bottom:12px}
-.message .avatar{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,0.02);font-size:18px}
-.message .bubble{max-width:78%;padding:10px;border-radius:12px;background:rgba(255,255,255,0.02);color:inherit}
+body{margin:0;font-family:Inter,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#04101a,#071023);color:#e6eef5;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.chat{width:min(900px,96%);background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:14px;padding:18px;box-shadow:0 10px 40px rgba(2,6,23,0.7);border:1px solid rgba(255,255,255,0.02);overflow:hidden}
+.chat-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.brand{display:flex;gap:12px;align-items:center}
+.logo{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,#15303a,#0b5566);font-size:20px}
+.titles h1{font-size:1.1rem;margin:0}
+.subtitle{margin:0;font-size:0.82rem;color:var(--muted)}
+.controls{display:flex;gap:8px;align-items:center}
+.icon-btn{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px;color:var(--muted);cursor:pointer}
+.messages{max-height:520px;overflow:auto;padding:12px;border-radius:10px;background:transparent;margin-bottom:12px;display:flex;flex-direction:column;gap:10px}
+.message{display:flex;gap:12px;align-items:flex-end;margin-bottom:4px;opacity:1;transform:translateY(0);transition:transform 240ms ease, opacity 240ms ease}
+.message.enter{opacity:0;transform:translateY(10px)}
+.message .avatar{width:40px;height:40px;border-radius:8px;display:grid;place-items:center;background:rgba(255,255,255,0.02);font-size:18px}
+.message .bubble{max-width:78%;padding:12px;border-radius:12px;background:var(--bubble-grad);backdrop-filter:blur(6px);color:inherit;box-shadow:0 6px 18px rgba(2,6,23,0.6)}
 .message .bubble .text{white-space:pre-wrap}
-.message .bubble .meta{display:flex;gap:8px;align-items:center;margin-top:6px;font-size:0.78rem;color:var(--muted)}
+.message .bubble .meta{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:0.78rem;color:var(--muted)}
 .message.user{justify-content:flex-end}
-.message.user .bubble{background:rgba(61,220,132,0.12);color:#bff5d6;border-bottom-right-radius:6px;border-bottom-left-radius:12px}
+.message.user .bubble{background:linear-gradient(135deg,rgba(61,220,132,0.12),rgba(61,200,140,0.08));color:#cfffe3;border-bottom-right-radius:6px;border-bottom-left-radius:12px}
 .message.user .avatar{order:2}
 .message.bot .avatar{order:0}
-.composer{display:flex;gap:8px}
-.composer textarea{flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;resize:none;overflow:hidden}
-.composer button{padding:10px 14px;border-radius:8px;border:0;background:var(--accent);color:#042017;font-weight:600}
-.help{color:var(--muted);font-size:0.9rem;margin-top:8px}
+.composer{display:flex;gap:8px;align-items:end}
+.composer textarea{flex:1;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);color:inherit;resize:none;overflow:hidden;font-size:0.95rem}
+.composer button{display:grid;place-items:center;width:44px;height:44px;padding:8px;border-radius:10px;border:0;background:var(--send);color:#042017}
+.composer button svg{display:block}
+.help{color:var(--muted);font-size:0.9rem;margin-top:10px}
+.copy{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted);padding:4px 8px;border-radius:6px;font-size:0.8rem}
+.linklike{background:transparent;border:0;color:var(--accent);cursor:pointer}
 
 /* Spinner */
-.spinner{width:28px;height:28px;border-radius:6px;border:3px solid rgba(255,255,255,0.06);border-top-color:var(--accent);animation:spin 1s linear infinite;margin-left:6px}
+.spinner{width:28px;height:28px;border-radius:8px;border:3px solid rgba(255,255,255,0.04);border-top-color:var(--send);animation:spin 1s linear infinite;margin-left:6px}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* Typing dots */
@@ -28,8 +40,14 @@ body{margin:0;font-family:Inter,Helvetica,Arial,sans-serif;background:linear-gra
 .dots span:nth-child(3){animation-delay:0.3s}
 @keyframes dot{0%{transform:translateY(0);opacity:.6}50%{transform:translateY(-6px);opacity:1}100%{transform:translateY(0);opacity:.6}}
 
-/* Copy button */
-.copy{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted);padding:4px 8px;border-radius:6px;font-size:0.8rem}
+/* small screens */
+@media (max-width:560px){
+  .chat{padding:12px}
+  .logo{width:36px;height:36px}
+  .messages{max-height:60vh}
+  .message .bubble{max-width:76%}
+}
 
-/* Small tweaks */
-.linklike{background:transparent;border:0;color:var(--accent);cursor:pointer}
+/* subtle focus states */
+.icon-btn:focus, .composer textarea:focus, .copy:focus{outline:2px solid rgba(61,220,132,0.12);outline-offset:2px}
+

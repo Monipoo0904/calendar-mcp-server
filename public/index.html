@@ -8,16 +8,31 @@
   </head>
   <body>
     <main class="chat">
-      <h1>Event Calendar Chat</h1>
-      <div id="messages" class="messages"></div>
+      <header class="chat-header">
+        <div class="brand">
+          <div class="logo">📅</div>
+          <div class="titles">
+            <h1>Event Calendar</h1>
+            <p class="subtitle">Simple calendar assistant</p>
+          </div>
+        </div>
+        <div class="controls">
+          <button id="themeToggle" class="icon-btn" aria-label="Toggle theme">🌙</button>
+          <button id="clearBtnTop" class="linklike" aria-label="Clear conversation">Clear</button>
+        </div>
+      </header>
+
+      <div id="messages" class="messages" role="log" aria-live="polite"></div>
 
       <form id="form" class="composer" aria-label="Chat composer">
         <textarea id="input" rows="1" placeholder="Type a command (e.g. list, summarize, add:Title|YYYY-MM-DD|Desc)" autocomplete="off"></textarea>
-        <button id="sendBtn" type="submit" aria-label="Send message">Send</button>
+        <button id="sendBtn" type="submit" aria-label="Send message">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 21L23 12L2 3v7l15 2L2 14v7z" fill="currentColor"/></svg>
+        </button>
         <div id="spinner" class="spinner" aria-hidden="true" hidden></div>
       </form>
 
-      <p class="help">Commands: <code>list</code>, <code>summarize</code>, <code>add:Title|YYYY-MM-DD|Desc</code>, <code>delete:Title</code> • <button id="clearBtn" class="linklike">Clear</button></p>
+      <p class="help">Commands: <code>list</code>, <code>summarize</code>, <code>add:Title|YYYY-MM-DD|Desc</code>, <code>delete:Title</code></p>
     </main>
 
     <script src="/script.js"></script>
