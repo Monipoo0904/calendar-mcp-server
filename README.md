@@ -29,3 +29,7 @@ Notes
 
 - Vercel serverless functions are stateless — events are stored in-memory and **will reset** frequently.
 - The demo includes a `handle_message` tool for simple chat-like commands: `list`, `summarize`, `add:Title|YYYY-MM-DD|Desc`, `delete:Title`.
+
+Frontend improvements:
+
+- Chat UI now supports typing indicator, timestamps, avatars, copy-to-clipboard buttons, Shift+Enter for newlines, Enter to send, and conversation persistence in `localStorage`. The composer shows a spinner while the backend responds and disables input until a reply is received.

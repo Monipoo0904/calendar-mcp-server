@@ -2,11 +2,34 @@
 *{box-sizing:border-box}
 body{margin:0;font-family:Inter,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#071022,#081123);color:#e6eef5;min-height:100vh;display:grid;place-items:center}
 .chat{width:min(820px,96%);background:var(--card);border-radius:10px;padding:20px;box-shadow:0 6px 24px rgba(2,6,23,0.7)}
-.messages{height:340px;overflow:auto;padding:10px;border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);margin-bottom:12px}
-.message{padding:8px 12px;border-radius:8px;margin-bottom:8px}
-.message.user{background:rgba(61,220,132,0.12);color:#bff5d6;text-align:right}
-.message.bot{background:rgba(255,255,255,0.02);color:#dfe9f3;text-align:left}
+.messages{height:340px;overflow:auto;padding:10px;border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);margin-bottom:12px;display:flex;flex-direction:column}
+.message{display:flex;gap:10px;align-items:flex-end;margin-bottom:12px}
+.message .avatar{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,0.02);font-size:18px}
+.message .bubble{max-width:78%;padding:10px;border-radius:12px;background:rgba(255,255,255,0.02);color:inherit}
+.message .bubble .text{white-space:pre-wrap}
+.message .bubble .meta{display:flex;gap:8px;align-items:center;margin-top:6px;font-size:0.78rem;color:var(--muted)}
+.message.user{justify-content:flex-end}
+.message.user .bubble{background:rgba(61,220,132,0.12);color:#bff5d6;border-bottom-right-radius:6px;border-bottom-left-radius:12px}
+.message.user .avatar{order:2}
+.message.bot .avatar{order:0}
 .composer{display:flex;gap:8px}
-.composer input{flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+.composer textarea{flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;resize:none;overflow:hidden}
 .composer button{padding:10px 14px;border-radius:8px;border:0;background:var(--accent);color:#042017;font-weight:600}
 .help{color:var(--muted);font-size:0.9rem;margin-top:8px}
+
+/* Spinner */
+.spinner{width:28px;height:28px;border-radius:6px;border:3px solid rgba(255,255,255,0.06);border-top-color:var(--accent);animation:spin 1s linear infinite;margin-left:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Typing dots */
+.dots{display:flex;gap:6px;width:48px}
+.dots span{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.12);animation:dot 1s infinite}
+.dots span:nth-child(2){animation-delay:0.15s}
+.dots span:nth-child(3){animation-delay:0.3s}
+@keyframes dot{0%{transform:translateY(0);opacity:.6}50%{transform:translateY(-6px);opacity:1}100%{transform:translateY(0);opacity:.6}}
+
+/* Copy button */
+.copy{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted);padding:4px 8px;border-radius:6px;font-size:0.8rem}
+
+/* Small tweaks */
+.linklike{background:transparent;border:0;color:var(--accent);cursor:pointer}

@@ -160,9 +160,19 @@ async def call_mcp(request: Request):
             content={"error": str(e)}
         )
 
-# Serve static files from public directory
-if os.path.exists("public"):
-    app.mount("/", StaticFiles(directory="public", html=True), name="static")
+# Serve static files from public directory using an absolute path so Vercel finds them
+public_dir = os.path.join(os.path.dirname(__file__), "public")
+if os.path.isdir(public_dir):
+    app.mount("/", StaticFiles(directory=public_dir, html=True), name="static")
+# Fallback root in case StaticFiles isn't mounted for some reason
+from fastapi.responses import FileResponse
+
+@app.get("/", include_in_schema=False)
+async def root_index():
+    index_path = os.path.join(os.path.dirname(__file__), "public", "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path, media_type="text/html")
+    return JSONResponse(status_code=404, content={"detail": "Not Found"})
 
 if __name__ == "__main__": 
   mcp.run()

@@ -11,12 +11,13 @@
       <h1>Event Calendar Chat</h1>
       <div id="messages" class="messages"></div>
 
-      <form id="form" class="composer">
-        <input id="input" placeholder="Type a command (e.g. list, summarize, add:Title|YYYY-MM-DD|Desc)" autocomplete="off" />
-        <button type="submit">Send</button>
+      <form id="form" class="composer" aria-label="Chat composer">
+        <textarea id="input" rows="1" placeholder="Type a command (e.g. list, summarize, add:Title|YYYY-MM-DD|Desc)" autocomplete="off"></textarea>
+        <button id="sendBtn" type="submit" aria-label="Send message">Send</button>
+        <div id="spinner" class="spinner" aria-hidden="true" hidden></div>
       </form>
 
-      <p class="help">Commands: <code>list</code>, <code>summarize</code>, <code>add:Title|YYYY-MM-DD|Desc</code>, <code>delete:Title</code></p>
+      <p class="help">Commands: <code>list</code>, <code>summarize</code>, <code>add:Title|YYYY-MM-DD|Desc</code>, <code>delete:Title</code> • <button id="clearBtn" class="linklike">Clear</button></p>
     </main>
 
     <script src="/script.js"></script>
