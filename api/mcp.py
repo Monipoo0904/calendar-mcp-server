@@ -7,6 +7,26 @@ sys.path.append(os.getcwd())
 
 import main
 
+# -----------------------------------------
+# Developer notes (api/mcp.py)
+# - Vercel-compatible serverless handler for calling MCP tools from the frontend.
+# - Handles CORS preflight (OPTIONS) and expects POST requests with JSON bodies of the form:
+#     {"tool": "tool_name", "input": { ... }}
+# - This handler supports both frameworks that expose `request.json()` as an async coroutine
+#   and frameworks that provide `request.json` as a dict-like attribute by checking and
+#   awaiting when necessary.
+# - The handler calls `main.mcp.call_tool(tool_name, input)` and uses an `_unwrap()` helper
+#   to extract readable text from common return shapes (objects with `.text`, dicts with
+#   a `result` key, or lists/tuples containing these). It returns JSON: {"result": <text>}.
+# - Error handling:
+#   - 204 for OPTIONS preflight
+#   - 400 for missing tool name
+#   - 405 for unsupported methods
+#   - 500 for unexpected errors (exception message is included in the response body)
+# - Testing: see `test_local.py` which calls `handler()` directly with an async stub.
+# - When adding new tools in `main.py`, ensure they return strings or serializable types
+#   so the `_unwrap()` helper can extract meaningful output for the frontend.
+# -----------------------------------------
 
 async def handler(request):
     # Allow preflight CORS

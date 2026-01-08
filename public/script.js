@@ -1,3 +1,14 @@
+/*
+Developer notes (public/script.js)
+- Main responsibilities: rendering messages, handling composer actions, managing localStorage, theme toggle, and calling `/api/mcp`.
+- Key functions:
+  - renderMessage(msg): creates DOM nodes for each message. Avatars can be changed here.
+  - addLocalMessage(text, who): appends to `chat[]` and persists to localStorage (key: 'chat_messages').
+  - showTyping()/removeTyping(): typing indicator DOM.
+  - setFetching(state): disables input and shows spinner while awaiting server response.
+- Keep accessibility in mind: `.messages` has role="log" and aria-live="polite`.
+*/
+
 const form = document.getElementById('form');
 const input = document.getElementById('input'); // textarea
 const messages = document.getElementById('messages');
@@ -65,7 +76,7 @@ function renderMessage(msg){
   const el = document.createElement('div');
   el.className = 'message ' + (msg.who === 'user' ? 'user' : 'bot') + ' enter';
   el.innerHTML = `
-    <div class="avatar">${msg.who === 'user' ? '🧑' : '🤖'}</div>
+    <div class="avatar">${msg.who === 'user' ? '🌞' : '⭐'}</div>
     <div class="bubble">
       <div class="text">${escapeHtml(msg.text)}</div>
       <div class="meta">
@@ -92,7 +103,7 @@ function showTyping(){
   typingEl = document.createElement('div');
   typingEl.className = 'message bot typing';
   typingEl.innerHTML = `
-    <div class="avatar">🤖</div>
+    <div class="avatar">⭐</div>
     <div class="bubble"><div class="dots"><span></span><span></span><span></span></div></div>
   `;
   messages.appendChild(typingEl);

@@ -4,6 +4,16 @@ from datetime import datetime
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+
+# -----------------------------------------
+# Developer notes (main.py)
+# - This file defines MCP tools (use @mcp.tool()) and a small FastAPI app that exposes
+#   the `/api/mcp` POST endpoint for tool calls. It also mounts the `public/` folder
+#   as static files for the frontend. Events are stored in-memory (the `events` list).
+# - To add a new tool: add a function decorated with `@mcp.tool()` returning a string
+#   or serializable dict. Use `mcp.call_tool()` to invoke tools programmatically.
+# -----------------------------------------
+
 import os
 
 # Create an MCP server 
