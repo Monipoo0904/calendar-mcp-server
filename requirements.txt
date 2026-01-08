@@ -1,4 +1,4 @@
 # Minimal dependencies for local testing and optional FastAPI usage
 fastapi>=0.100.0
 uvicorn>=0.23.0
-mcp>=0.1.0
+mcp @ git+https://github.com/modelcontextprotocol/python-sdk.git
