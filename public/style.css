@@ -1,5 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-:root{--bg:#071023;--card:#071429;--muted:#9fb0c1;--accent:#3ddc84;--glass:rgba(255,255,255,0.03);--bubble-grad:linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01));--send:#3ddc84}
+:root{--bg:#071023;--card:#071429;--muted:#9fb0c1;--accent:#3ddc84;--glass:rgba(255,255,255,0.03);--bubble-grad:linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01));--send:#3ddc84;--panel-bg:rgba(255,255,255,0.02);--msg-hover-shadow: 0 10px 30px rgba(2,6,23,0.5)}
 /* Light theme overrides (Coolors palette) */
 [data-theme="light"]{
   /* Palette: #edede9 #d6ccc2 #f5ebe0 #d5bdaf #e3d5ca */
@@ -10,6 +10,8 @@
   --glass: rgba(237,237,233,0.6);
   --bubble-grad: linear-gradient(180deg,#f5ebe0,#edede9);
   --send: #d5bdaf;
+  --panel-bg: #ffffff;
+  --msg-hover-shadow: 0 12px 30px rgba(0,0,0,0.08);
   color-scheme: light;
 }
 *{box-sizing:border-box}
@@ -27,13 +29,17 @@ body{margin:0;font-family:Inter,Helvetica,Arial,sans-serif;background:var(--bg);
 [data-theme="light"] .titles::before{color:rgba(0,0,0,0.12)}
 .controls{display:flex;gap:8px;align-items:center}
 .icon-btn{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px;color:var(--muted);cursor:pointer}
-.messages{max-height:520px;overflow:auto;padding:12px;border-radius:10px;background:transparent;margin-bottom:12px;display:flex;flex-direction:column;gap:10px}
-.message{display:flex;gap:12px;align-items:flex-end;margin-bottom:4px;opacity:1;transform:translateY(0);transition:transform 240ms ease, opacity 240ms ease}
+.messages{max-height:520px;overflow:auto;padding:20px;border-radius:14px;background:var(--panel-bg);margin-bottom:12px;display:flex;flex-direction:column;gap:12px;border:1px solid rgba(2,6,23,0.04)}
+.message{display:flex;gap:12px;align-items:flex-end;margin-bottom:4px;opacity:1;transform:translateY(0);transition:transform 200ms ease, opacity 200ms ease, box-shadow 200ms ease}
 .message.enter{opacity:0;transform:translateY(10px)}
+.message:hover{transform:translateY(-4px);box-shadow:var(--msg-hover-shadow)}
 .message .avatar{width:40px;height:40px;border-radius:8px;display:grid;place-items:center;background:rgba(255,255,255,0.02);font-size:18px}
-.message .bubble{max-width:78%;padding:12px;border-radius:12px;background:var(--bubble-grad);backdrop-filter:blur(6px);color:inherit;box-shadow:0 6px 18px rgba(2,6,23,0.6)}
+.message .bubble{position:relative;max-width:78%;padding:12px;border-radius:12px;background:var(--bubble-grad);backdrop-filter:blur(6px);color:inherit;box-shadow:0 6px 18px rgba(2,6,23,0.06);transition:background 200ms ease}
 .message .bubble .text{white-space:pre-wrap}
 .message .bubble .meta{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:0.78rem;color:var(--muted)}
+/* copy button visibility on hover */
+.message .copy{opacity:0;transition:opacity 160ms ease}
+.message:hover .copy{opacity:1}
 .message.user{justify-content:flex-end}
 .message.user .bubble{background:linear-gradient(135deg,rgba(61,220,132,0.12),rgba(61,200,140,0.08));color:#0b2b1f;border-bottom-right-radius:6px;border-bottom-left-radius:12px}
 [data-theme="light"] .message.user .bubble{background:linear-gradient(135deg,rgba(213,189,175,0.18),rgba(227,213,202,0.12));color:#3b2b26}
