@@ -30,7 +30,20 @@ function load() {
 function setTheme(t){
   document.documentElement.setAttribute('data-theme', t);
   localStorage.setItem('ui_theme', t);
-  themeToggle.textContent = t === 'dark' ? '☀️' : '🌙';
+  // update toggle icon and label
+  if (t === 'dark'){
+    themeToggle.textContent = '☀️';
+    themeToggle.setAttribute('aria-label','Switch to light theme');
+  } else {
+    themeToggle.textContent = '🌙';
+    themeToggle.setAttribute('aria-label','Switch to dark theme');
+  }
+  // adjust text color in light mode
+  if (t === 'light'){
+    document.documentElement.style.color = '#071429';
+  } else {
+    document.documentElement.style.color = '';
+  }
 }
 
 function loadTheme(){
