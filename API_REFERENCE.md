@@ -756,7 +756,6 @@ Response:
 
 For issues, questions, or feature requests:
 - GitHub Issues: https://github.com/Monipoo0904/calendar-mcp-server/issues
-- Email: [repository maintainer email]
 
 ---
 

@@ -9,7 +9,7 @@ Current Implementation:
 - Basic CRUD operations for calendar events
 - Date validation using ISO 8601 format (YYYY-MM-DD)
 
-Future Enhancements (Calendar Synchronization):
+Future Enhancements (Planned, Not Yet Implemented):
 - OAuth 2.0 authentication for calendar API integration
 - Google Calendar and Outlook Calendar synchronization
 - .ics file import/export functionality

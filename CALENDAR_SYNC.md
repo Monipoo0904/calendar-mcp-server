@@ -45,7 +45,7 @@ The calendar synchronization feature aims to:
 1. **Google Calendar API**
    - Provider: Google Identity Platform
    - Scope: `https://www.googleapis.com/auth/calendar`
-   - Documentation: https://developers.google.com/identity/protocols/oauth2
+   - Documentation: https://developers.google.com/calendar/auth
 
 2. **Microsoft Outlook Calendar**
    - Provider: Microsoft Identity Platform (Azure AD)

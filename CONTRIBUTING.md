@@ -59,6 +59,8 @@ Good first issues for new contributors:
 
 Check the [GitHub Issues](https://github.com/Monipoo0904/calendar-mcp-server/issues) page.
 
+**Note**: If you'd like to contribute but no existing issue matches your idea, please create a new issue first to discuss the proposed changes with maintainers before starting work.
+
 ---
 
 ## Development Setup
