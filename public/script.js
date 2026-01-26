@@ -187,7 +187,8 @@ window.addEventListener('load', ()=> input.focus());
       if (provider === 'Google') {
         window.location.href = '/redirect_google.html';
       } else if (provider === 'Microsoft') {
-        window.location.href = '/redirect_microsoft.html';
+        // direct to Microsoft domain per request
+        window.location.href = 'https://www.microsoft.com';
       } else {
         window.location.href = 'https://www.google.com';
       }
