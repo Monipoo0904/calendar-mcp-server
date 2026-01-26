@@ -42,6 +42,11 @@ body{margin:0;font-family:Inter,Helvetica,Arial,sans-serif;background:var(--bg);
 .subtitle{margin:0;font-size:0.82rem;color:var(--muted)}
 .controls{display:flex;gap:8px;align-items:center}
 .icon-btn{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px;color:var(--muted);cursor:pointer}
+.auth-controls{display:flex;gap:8px;align-items:center}
+.auth-controls .auth-button{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:999px;border:1px solid rgba(0,0,0,0.06);background:var(--panel-bg);color:var(--text);cursor:pointer;font-weight:600;box-shadow:0 8px 20px rgba(16,24,40,0.06);transition:transform 160ms ease, box-shadow 160ms ease}
+.auth-controls .auth-button:hover{transform:translateY(-3px);box-shadow:0 14px 30px rgba(16,24,40,0.10)}
+.auth-controls .auth-button:active{transform:translateY(-1px);box-shadow:0 8px 18px rgba(16,24,40,0.08)}
+.auth-controls .auth-button:focus{outline:2px solid rgba(0,0,0,0.06);outline-offset:3px}
 .messages{max-height:520px;overflow:auto;padding:20px;border-radius:14px;background:var(--panel-bg);margin-bottom:12px;display:flex;flex-direction:column;gap:12px;border:1px solid rgba(2,6,23,0.04)}
 .message{display:flex;gap:12px;align-items:flex-end;margin-bottom:4px;opacity:1;transform:translateY(0);transition:transform 200ms ease, opacity 200ms ease, box-shadow 200ms ease}
 .message.enter{opacity:0;transform:translateY(10px)}
