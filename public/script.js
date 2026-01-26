@@ -151,7 +151,9 @@ load();
 if (chat.length){
   chat.forEach(renderMessage);
 } else {
-  addLocalMessage('Welcome! Try commands: list, summarize, add:Title|YYYY-MM-DD|Desc, delete:Title', 'bot');
+  addLocalMessage(`Welcome! You can use short commands or natural phrases.
+Examples: "list", "summarize", "Add Birthday on 2026-02-01", "Add Meeting March 5 about planning", "Add Lunch tomorrow".
+Shorthand: add:Title|YYYY-MM-DD|Desc`, 'bot');
 }
 
 // accessibility: focus input on load
