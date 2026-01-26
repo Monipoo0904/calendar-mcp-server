@@ -179,9 +179,19 @@ window.addEventListener('load', ()=> input.focus());
   const mbtn = document.getElementById('signinMicrosoft');
   // For testing locally we provide a simple test handler that doesn't perform OAuth.
   function testSignIn(provider){
-    console.log('Test sign-in clicked:', provider);
-    addLocalMessage(`${provider} test sign-in clicked (test button)`, 'user');
+    console.log('Sign-in clicked:', provider);
+    addLocalMessage(`${provider} sign-in clicked`, 'user');
     addLocalMessage(`(Test) Simulated auth response for ${provider}.`, 'bot');
+    // small delay so messages render before navigation
+    setTimeout(() => {
+      if (provider === 'Google') {
+        window.location.href = '/redirect_google.html';
+      } else if (provider === 'Microsoft') {
+        window.location.href = '/redirect_microsoft.html';
+      } else {
+        window.location.href = 'https://www.google.com';
+      }
+    }, 700);
   }
 
   if (gbtn) gbtn.addEventListener('click', () => testSignIn('Google'));
