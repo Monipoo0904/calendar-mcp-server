@@ -147,6 +147,45 @@ if (chat.length){
 
 // accessibility: focus input on load
 window.addEventListener('load', ()=> input.focus());
+  
+  // OAuth sign-in helpers
+  async function startOauth(provider) {
+    try {
+      const resp = await fetch('/api/mcp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool: 'oauth_login', input: { provider } })
+      });
+      const body = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        showBanner((body && body.error) ? JSON.stringify(body.error) : `Error ${resp.status}` , 'error');
+        return;
+      }
+      const result = body.result;
+      const url = (typeof result === 'string') ? result : (result?.auth_url || result?.url || result?.redirect_url);
+      if (url) {
+        // perform a top-level redirect to avoid popup blocking
+        window.location.href = url;
+        return;
+      }
+      showBanner('No authentication URL returned by server', 'error');
+    } catch (err) {
+      console.error('OAuth start failed', err);
+      showBanner('Failed to start authentication', 'error');
+    }
+  }
+
+  const gbtn = document.getElementById('signinGoogle');
+  const mbtn = document.getElementById('signinMicrosoft');
+  // For testing locally we provide a simple test handler that doesn't perform OAuth.
+  function testSignIn(provider){
+    console.log('Test sign-in clicked:', provider);
+    addLocalMessage(`${provider} test sign-in clicked (test button)`, 'user');
+    addLocalMessage(`(Test) Simulated auth response for ${provider}.`, 'bot');
+  }
+
+  if (gbtn) gbtn.addEventListener('click', () => testSignIn('Google'));
+  if (mbtn) mbtn.addEventListener('click', () => testSignIn('Microsoft'));
 
 // Keep theme set when page loads
 loadTheme();

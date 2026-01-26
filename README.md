@@ -48,4 +48,43 @@ Frontend improvements:
 
 If you plan to edit or extend this project, see `DEVELOPING.md` for a detailed developer guide (setup, editing the frontend and backend, testing, and deployment to Vercel).
 
+
 Contributions should follow the branch-per-feature workflow and include clear commit messages (use prefixes like `feat:`, `fix:`, `style:`, or `docs:`). Please open a PR for review and testing before merging to the main branch.
+
+## Editing Test Sign-in Buttons
+
+These buttons in the UI are currently wired as local test buttons (they do not perform OAuth). To edit them or change their behavior:
+
+- File: [public/index.html](public/index.html#L1)
+  - Buttons: `#signinGoogle` and `#signinMicrosoft` are in the header under `.auth-controls`.
+  - Change the button label or markup directly in this file.
+
+- File: [public/script.js](public/script.js#L1)
+  - Test handler: `testSignIn(provider)` simulates a sign-in. Edit or replace this function to change test behavior.
+  - To restore real OAuth behavior, replace the click handlers with the `startOauth(provider)` calls:
+
+```js
+// example: restore OAuth start
+document.getElementById('signinGoogle').addEventListener('click', () => startOauth('google'));
+document.getElementById('signinMicrosoft').addEventListener('click', () => startOauth('microsoft'));
+```
+
+- Quick test locally:
+
+```bash
+# start the local test harness
+python -m pip install -r requirements.txt
+python test_local.py
+
+# open the app at http://localhost:3000 (or the port printed by the harness)
+```
+
+- Commit & push changes:
+
+```bash
+git add public/index.html public/script.js README.md
+git commit -m "chore: add test sign-in buttons and docs"
+git push origin HEAD:copilot/integrate-oauth-email-login
+```
+
+These notes keep the UI test-friendly and make it easy to rewire the buttons for a real OAuth flow later.
