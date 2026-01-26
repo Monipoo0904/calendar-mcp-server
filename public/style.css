@@ -78,6 +78,11 @@ body{margin:0;font-family:Inter,Helvetica,Arial,sans-serif;background:var(--bg);
 .composer textarea{flex:1;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);color:inherit;resize:none;overflow:hidden;font-size:0.95rem}
 .composer button{display:grid;place-items:center;width:44px;height:44px;padding:8px;border-radius:10px;border:0;background:var(--send);color:#042017}
 .composer button svg{display:block}
+.composer-field{position:relative;flex:1}
+.composer-tooltip{position:absolute;left:0;bottom:calc(100% + 10px);width:min(520px,92%);background:var(--panel-bg);color:var(--text);border:1px solid rgba(0,0,0,0.08);padding:10px 12px;border-radius:10px;box-shadow:0 14px 30px rgba(16,24,40,0.08);opacity:0;transform:translateY(6px);transition:opacity 180ms ease, transform 180ms ease;pointer-events:none;z-index:40}
+.composer-tooltip .examples{margin-top:6px}
+.composer-tooltip .shorthand{margin-top:8px;font-size:0.85rem;color:var(--muted)}
+.composer-field:focus-within .composer-tooltip{opacity:1;transform:translateY(0);pointer-events:auto}
 .help{color:var(--muted);font-size:0.9rem;margin-top:10px}
 .copy{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted);padding:4px 8px;border-radius:6px;font-size:0.8rem}
 .linklike{background:transparent;border:0;color:var(--accent);cursor:pointer}

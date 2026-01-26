@@ -31,8 +31,15 @@
       <div id="messages" class="messages" role="log" aria-live="polite"></div>
 
       <form id="form" class="composer" aria-label="Chat composer">
-        <textarea id="input" rows="1" placeholder="Try: 'list', 'summarize', or natural phrases like 'Add Birthday on 2026-02-01', 'Add Meeting March 5 about planning' (shorthand: add:Title|YYYY-MM-DD|Desc)" aria-label="Type a command or natural phrase, for example: Add Birthday on 2026-02-01; Add Meeting March 5 about planning; Add Lunch tomorrow" title="Examples: Add Birthday on 2026-02-01; Add Meeting March 5 about planning; Add Lunch tomorrow" aria-describedby="composerHelp" autocomplete="off"></textarea>
-        <span id="composerHelp" class="visually-hidden">Examples: Add Birthday on 2026-02-01; Add Meeting March 5 about planning; Add Lunch tomorrow; Shorthand: add:Title|YYYY-MM-DD|Desc</span>
+        <div class="composer-field">
+          <textarea id="input" rows="1" placeholder="Try: 'list', 'summarize', or natural phrases like 'Add Birthday on 2026-02-01', 'Add Meeting March 5 about planning' (shorthand: add:Title|YYYY-MM-DD|Desc)" aria-label="Type a command or natural phrase, for example: Add Birthday on 2026-02-01; Add Meeting March 5 about planning; Add Lunch tomorrow" title="Examples: Add Birthday on 2026-02-01; Add Meeting March 5 about planning; Add Lunch tomorrow" aria-describedby="composerHelp composerTooltip" autocomplete="off"></textarea>
+          <div id="composerTooltip" class="composer-tooltip" role="status" aria-hidden="true">
+            <strong>Examples:</strong>
+            <div class="examples">Add Birthday on 2026-02-01; Add Meeting March 5 about planning; Add Lunch tomorrow</div>
+            <div class="shorthand">Shorthand: add:Title|YYYY-MM-DD|Desc</div>
+          </div>
+          <span id="composerHelp" class="visually-hidden">Examples: Add Birthday on 2026-02-01; Add Meeting March 5 about planning; Add Lunch tomorrow; Shorthand: add:Title|YYYY-MM-DD|Desc</span>
+        </div>
         <button id="sendBtn" type="submit" aria-label="Send message">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 21L23 12L2 3v7l15 2L2 14v7z" fill="currentColor"/></svg>
         </button>
