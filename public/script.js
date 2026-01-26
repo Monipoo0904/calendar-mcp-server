@@ -9,6 +9,15 @@ Developer notes (public/script.js)
 - Keep accessibility in mind: `.messages` has role="log" and aria-live="polite`.
 */
 
+/* === Sections ===
+ - Initialization & DOM refs
+ - Storage helpers (save/load)
+ - Theme helpers (setTheme, loadTheme)
+ - Rendering helpers (renderMessage, addLocalMessage)
+ - Composer and network (form submit)
+ - OAuth / test sign-in helpers
+*/
+
 const form = document.getElementById('form');
 const input = document.getElementById('input'); // textarea
 const messages = document.getElementById('messages');

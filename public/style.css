@@ -1,8 +1,12 @@
 /*
 Developer notes (public/style.css)
-- Theme variables are defined in `:root` (dark defaults) and overridden under `[data-theme="light"]`.
-- To change global colors, edit variables such as --bg, --panel-bg, --text, --muted, --send, and --bubble-grad.
-- Keep color contrast in mind and test with Lighthouse/axe for accessibility.
+*/
+/* === Sections ===
+ - Palette & variables (top :root)
+ - Layout and header
+ - Message / avatar styles
+ - Composer and controls
+ - Helpers (spinner, typing dots)
 */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 :root{

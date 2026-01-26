@@ -86,6 +86,20 @@ git push origin HEAD:copilot/integrate-oauth-email-login
 
 These notes give a quick map to the most commonly-edited parts of the app. If you want, I can add a short `DEVELOPING.md` with the same content and a small checklist for PRs.
 
+## Exact Locations
+
+For quick editing, here are the exact file locations and line ranges for common edits:
+
+- Sign-in buttons: [public/index.html](public/index.html#L23-L24)
+- Client handlers and helpers: [public/script.js](public/script.js#L148-L199) (`startOauth` at [public/script.js](public/script.js#L152), `testSignIn` at [public/script.js](public/script.js#L181-L196), `loadTheme` at [public/script.js](public/script.js#L60-L63))
+- Message rendering & helpers: `renderMessage` at [public/script.js](public/script.js#L75-L92), `addLocalMessage` at [public/script.js](public/script.js#L94-L99)
+- Theme variables (palette): [public/style.css](public/style.css#L8-L20)
+- Sign-in button styles: [public/style.css](public/style.css#L45-L49)
+- Avatar styles: [public/style.css](public/style.css#L54-L58)
+- Redirect pages: [public/redirect_google.html](public/redirect_google.html#L5) and [public/redirect_microsoft.html](public/redirect_microsoft.html#L5)
+
+Use these links when making small edits; they point directly to the relevant lines in the workspace.
+
 ## Editing Test Sign-in Buttons
 
 These buttons in the UI are currently wired as local test buttons (they do not perform OAuth). To edit them or change their behavior:
