@@ -260,6 +260,10 @@ def handle_message(message: str) -> str:
     "You can also use the shorthand: add:Title|YYYY-MM-DD|Desc, delete:Title, list, summarize."
   )
 
+
+
+
+
 # FastAPI endpoint for MCP tool calls
 @app.post("/api/mcp")
 async def call_mcp(request: Request):
@@ -318,7 +322,8 @@ async def root_index():
         return FileResponse(index_path, media_type="text/html")
     return JSONResponse(status_code=404, content={"detail": "Not Found"})
 
-if __name__ == "__main__": 
+
+if __name__ == "__main__":
   mcp.run()
  
 
