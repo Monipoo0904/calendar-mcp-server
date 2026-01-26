@@ -120,6 +120,57 @@ def handle_message(message: str) -> str:
     if m:
       return m.group(1)
     return None
+  
+  def find_date_in_msg(s: str):
+    """Try to find a date in the message and return (ISO-date, (start, end)) or (None, None).
+    Supports: YYYY-MM-DD, MM/DD[/YYYY], month names (e.g. March 5 2026), 'today', 'tomorrow'.
+    """
+    s_norm = s
+    # today / tomorrow
+    for tok in ("today", "tomorrow"):
+      idx = s_norm.find(tok)
+      if idx != -1:
+        return parse_date_token(tok), (idx, idx + len(tok))
+
+    # ISO YYYY-MM-DD
+    m = re.search(r"(\d{4}-\d{2}-\d{2})", s_norm)
+    if m:
+      return m.group(1), m.span(1)
+
+    # MM/DD[/YYYY]
+    m = re.search(r"(\d{1,2}/\d{1,2}(?:/\d{2,4})?)", s_norm)
+    if m:
+      part = m.group(1)
+      try:
+        parts = part.split('/')
+        if len(parts) == 3:
+          mo,da,yr = parts
+          yr = yr if len(yr) == 4 else ('20' + yr)
+        else:
+          mo,da = parts
+          yr = str(datetime.today().year)
+        iso = f"{int(yr):04d}-{int(mo):02d}-{int(da):02d}"
+        return iso, m.span(1)
+      except Exception:
+        pass
+
+    # Month name patterns: March 5 2026, Mar 5, March 5th
+    months = {
+      'january':1,'jan':1,'february':2,'feb':2,'march':3,'mar':3,'april':4,'apr':4,
+      'may':5,'june':6,'jun':6,'july':7,'jul':7,'august':8,'aug':8,'september':9,'sep':9,'sept':9,
+      'october':10,'oct':10,'november':11,'nov':11,'december':12,'dec':12
+    }
+    m = re.search(r"\b([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s*(\d{4}))?\b", s_norm)
+    if m:
+      mon = m.group(1).lower()
+      day = int(m.group(2))
+      yr = m.group(3)
+      if mon in months:
+        year = int(yr) if yr else datetime.today().year
+        iso = f"{year:04d}-{months[mon]:02d}-{day:02d}"
+        return iso, m.span(0)
+
+    return None, None
 
   # Summaries
   if any(k in low for k in ("summarize", "summary", "what's coming", "upcoming", "brief")):
@@ -139,8 +190,9 @@ def handle_message(message: str) -> str:
       return result
     return view_events()
 
-  # Add (support legacy 'add:' and conversational patterns)
+  # Add (support legacy 'add:' shorthand and more natural conversational phrases)
   if low.startswith("add:") or low.startswith("create:") or low.startswith("schedule:"):
+    # legacy shorthand: add:Title|YYYY-MM-DD|Optional description
     parts = msg.split(":", 1)[1].split("|")
     if len(parts) < 2:
       return "Invalid add command. Use: add:Title|YYYY-MM-DD|Optional description or say 'Add Meeting on 2026-01-01'"
@@ -149,21 +201,45 @@ def handle_message(message: str) -> str:
     description = parts[2].strip() if len(parts) > 2 else ""
     return add_event(title, date, description)
 
-  m = re.match(r'^(?:add|create|schedule)\s+(?P<title>.+?)\s+(?:on|for)\s+(?P<date>\d{4}-\d{2}-\d{2})(?:\s*(?:about|desc:|description:)\s*(?P<desc>.*))?$', msg, re.I)
-  if m:
-    title = m.group('title').strip()
-    date = m.group('date').strip()
-    description = (m.group('desc') or '').strip()
-    return add_event(title, date, description)
+  # Conversational adds: try to find a date token anywhere and treat text around it as the title/description.
+  verb_match = re.match(r'^(?:add|create|schedule)\b\s*(.*)$', msg, re.I)
+  if verb_match:
+    rest = verb_match.group(1).strip()
+    # Look for explicit date inside the rest
+    date_iso, span = find_date_in_msg(rest)
+    if date_iso and span:
+      start, end = span
+      # title is the text before the date token
+      title = rest[:start].strip()
+      # strip common leading words like 'on' or 'for' from title
+      title = re.sub(r'\b(on|for)\b\s*$', '', title, flags=re.I).strip()
+      # description: look for 'about' or 'with' after the date
+      desc = ''
+      after = rest[end:].strip()
+      mdesc = re.search(r'(?:about|with|desc:|description:)\s*(.*)$', after, re.I)
+      if mdesc:
+        desc = mdesc.group(1).strip()
+      # if no explicit title (e.g., user said 'Add on March 5'), ask for title
+      if not title:
+        return "Please provide a title for the event, e.g. 'Add Dentist on March 5'."
+      return add_event(title, date_iso, desc)
 
-  # 'Add ... tomorrow' or 'Add ... today'
-  m2 = re.match(r'^(?:add|create|schedule)\s+(?P<title>.+?)\s+(?P<d>today|tomorrow)$', msg, re.I)
-  if m2:
-    title = m2.group('title').strip()
-    date = parse_date_token(m2.group('d'))
-    if date:
-      return add_event(title, date, "")
-    return "Couldn't parse the date. Use YYYY-MM-DD, 'today' or 'tomorrow'."
+    # If no date found but rest is short like 'meeting tomorrow' handled earlier by find_date_in_msg
+    # check words like 'today'/'tomorrow' anywhere
+    for tok in ('today', 'tomorrow'):
+      if tok in rest.lower():
+        date_iso = parse_date_token(tok)
+        title = re.sub(r'\b' + tok + r'\b', '', rest, flags=re.I).strip()
+        title = re.sub(r'\b(on|for)\b\s*$', '', title, flags=re.I).strip()
+        if not title:
+          return "Please provide a title for the event, e.g. 'Add Lunch tomorrow'."
+        return add_event(title, date_iso, '')
+
+    # No date found: fall back to previous behaviors (help message)
+    # We still accept simple 'Add <Title>' but ask for a date.
+    if rest and len(rest.split()) <= 6:
+      return "I can add that — please include a date (e.g. 'on 2026-03-03', 'tomorrow', or 'March 3')."
+    # otherwise fall through to help
 
   # Delete (support legacy 'delete:' and conversational forms)
   if low.startswith("delete:"):
