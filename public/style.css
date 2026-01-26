@@ -1,0 +1,103 @@
+/*
+Developer notes (public/style.css)
+*/
+/* === Sections ===
+ - Palette & variables (top :root)
+ - Layout and header
+ - Message / avatar styles
+ - Composer and controls
+ - Helpers (spinner, typing dots)
+*/
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+:root{
+  /* Default: lighter palette */
+  --bg: linear-gradient(180deg,#f7f3ee,#fbf7f3);
+  --card: #efe6dc;
+  --muted: #6b6b6b;
+  --accent: #b99d8e;
+  --glass: rgba(255,255,255,0.9);
+  --bubble-grad: linear-gradient(180deg,#f7f3ee,#efe6dc);
+  --send: #c7a892;
+  --panel-bg: #ffffff;
+  --msg-hover-shadow: 0 12px 30px rgba(0,0,0,0.06);
+  --text: #222222;
+  color-scheme: light;
+}
+
+/* Make typed text and UI readable by default (light) */
+body { color: var(--text); }
+.composer textarea{
+  color: #1f1f1f;
+  background: #ffffff;
+  border-color: rgba(0,0,0,0.06);
+}
+.composer textarea::placeholder{ color: rgba(0,0,0,0.48); }
+.message .bubble{ color: var(--text); }
+.help{ color: #616161; }
+.messages{border:1px solid rgba(0,0,0,0.06);box-shadow:0 8px 18px rgba(0,0,0,0.04)}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,Helvetica,Arial,sans-serif;background:var(--bg);color:#e6eef5;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;transition:background 320ms ease,color 320ms ease}
+.chat{width:min(900px,96%);background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:14px;padding:18px;box-shadow:0 10px 40px rgba(2,6,23,0.07);border:1px solid rgba(255,255,255,0.02);overflow:hidden}
+.chat-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.brand{display:flex;gap:12px;align-items:center}
+.logo{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,#d6ccc2,#e3d5ca);font-size:20px}
+.titles{position:relative}
+.titles h1{font-size:1.1rem;margin:0}
+.subtitle{margin:0;font-size:0.82rem;color:var(--muted)}
+.controls{display:flex;gap:8px;align-items:center}
+.icon-btn{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px;color:var(--muted);cursor:pointer}
+.auth-controls{display:flex;gap:8px;align-items:center}
+.auth-controls .auth-button{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:999px;border:1px solid rgba(0,0,0,0.06);background:var(--panel-bg);color:var(--text);cursor:pointer;font-weight:600;box-shadow:0 8px 20px rgba(16,24,40,0.06);transition:transform 160ms ease, box-shadow 160ms ease}
+.auth-controls .auth-button:hover{transform:translateY(-3px);box-shadow:0 14px 30px rgba(16,24,40,0.10)}
+.auth-controls .auth-button:active{transform:translateY(-1px);box-shadow:0 8px 18px rgba(16,24,40,0.08)}
+.auth-controls .auth-button:focus{outline:2px solid rgba(0,0,0,0.06);outline-offset:3px}
+.messages{max-height:520px;overflow:auto;padding:20px;border-radius:14px;background:var(--panel-bg);margin-bottom:12px;display:flex;flex-direction:column;gap:12px;border:1px solid rgba(2,6,23,0.04)}
+.message{display:flex;gap:12px;align-items:flex-end;margin-bottom:4px;opacity:1;transform:translateY(0);transition:transform 200ms ease, opacity 200ms ease, box-shadow 200ms ease}
+.message.enter{opacity:0;transform:translateY(10px)}
+.message:hover{transform:translateY(-4px);box-shadow:var(--msg-hover-shadow)}
+.message .avatar{width:40px;height:40px;border-radius:8px;display:grid;place-items:center;background:rgba(255,255,255,0.02);font-size:18px}
+
+/* Ensure avatar icons (emoji) are rendered in high-contrast black for readability */
+.message .avatar{color:#000}
+.message.bot .avatar{color:#000}
+.message .bubble{position:relative;max-width:78%;padding:12px;border-radius:12px;background:var(--bubble-grad);backdrop-filter:blur(6px);color:inherit;box-shadow:0 6px 18px rgba(2,6,23,0.06);transition:background 200ms ease}
+.message .bubble .text{white-space:pre-wrap}
+.message .bubble .meta{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:0.78rem;color:var(--muted)}
+/* copy button visibility on hover */
+.message .copy{opacity:0;transition:opacity 160ms ease}
+.message:hover .copy{opacity:1}
+.message.user{justify-content:flex-end}
+.message.user .bubble{background:linear-gradient(135deg,rgba(61,220,132,0.12),rgba(61,200,140,0.08));color:#0b2b1f;border-bottom-right-radius:6px;border-bottom-left-radius:12px}
+[data-theme="light"] .message.user .bubble{background:linear-gradient(135deg,rgba(213,189,175,0.26),rgba(227,213,202,0.18));color:#3b2b26}
+.message.user .avatar{order:2}
+.message.bot .avatar{order:0}
+.composer{display:flex;gap:8px;align-items:end}
+.composer textarea{flex:1;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);color:inherit;resize:none;overflow:hidden;font-size:0.95rem}
+.composer button{display:grid;place-items:center;width:44px;height:44px;padding:8px;border-radius:10px;border:0;background:var(--send);color:#042017}
+.composer button svg{display:block}
+.help{color:var(--muted);font-size:0.9rem;margin-top:10px}
+.copy{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted);padding:4px 8px;border-radius:6px;font-size:0.8rem}
+.linklike{background:transparent;border:0;color:var(--accent);cursor:pointer}
+
+/* Spinner */
+.spinner{width:28px;height:28px;border-radius:8px;border:3px solid rgba(255,255,255,0.04);border-top-color:var(--send);animation:spin 1s linear infinite;margin-left:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Typing dots */
+.dots{display:flex;gap:6px;width:48px}
+.dots span{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.12);animation:dot 1s infinite}
+.dots span:nth-child(2){animation-delay:0.15s}
+.dots span:nth-child(3){animation-delay:0.3s}
+@keyframes dot{0%{transform:translateY(0);opacity:.6}50%{transform:translateY(-6px);opacity:1}100%{transform:translateY(0);opacity:.6}}
+
+/* small screens */
+@media (max-width:560px){
+  .chat{padding:12px}
+  .logo{width:36px;height:36px}
+  .messages{max-height:60vh}
+  .message .bubble{max-width:76%}
+}
+
+/* subtle focus states */
+.icon-btn:focus, .composer textarea:focus, .copy:focus{outline:2px solid rgba(61,220,132,0.12);outline-offset:2px}
+

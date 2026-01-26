@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Event Calendar Chat</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <!-- SECTION: Main chat UI (header, messages, composer) -->
+    <main class="chat">
+      <header class="chat-header">
+        <div class="brand">
+          <div class="logo">📅</div>
+          <div class="titles">
+            <h1>Event Calendar</h1>
+            <p class="subtitle">Simple calendar assistant</p>
+          </div>
+        </div>
+        <div class="controls">
+          <button id="themeToggle" class="icon-btn" aria-label="Toggle theme">🌙</button>
+          <button id="clearBtnTop" class="linklike" aria-label="Clear conversation">Clear</button>
+          <div class="auth-controls">
+            <button id="signinGoogle" class="auth-button" aria-label="Sign in with Google">Sign in with Google</button>
+            <button id="signinMicrosoft" class="auth-button" aria-label="Sign in with Microsoft">Sign in with Microsoft</button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Messages container (append chat bubbles here) -->
+      <div id="messages" class="messages" role="log" aria-live="polite"></div>
+
+      <form id="form" class="composer" aria-label="Chat composer">
+        <textarea id="input" rows="1" placeholder="Type a command (e.g. list, summarize, add:Title|YYYY-MM-DD|Desc)" autocomplete="off"></textarea>
+        <button id="sendBtn" type="submit" aria-label="Send message">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 21L23 12L2 3v7l15 2L2 14v7z" fill="currentColor"/></svg>
+        </button>
+        <div id="spinner" class="spinner" aria-hidden="true" hidden></div>
+      </form>
+
+      <p class="help">Commands: <code>list</code>, <code>summarize</code>, <code>add:Title|YYYY-MM-DD|Desc</code>, <code>delete:Title</code></p>
+    </main>
+
+    <script src="/script.js"></script>
+  </body>
+</html>

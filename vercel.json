@@ -1,7 +1,6 @@
 {
-  "functions": {
-    "api/*.py": {
-      "runtime": "python3.11"
-    }
-  }
+  "installCommand": "pip install -r requirements.txt",
+  "redirects": [
+    { "source": "/", "destination": "/index.html", "permanent": false }
+  ]
 }
