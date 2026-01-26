@@ -51,6 +51,41 @@ If you plan to edit or extend this project, see `DEVELOPING.md` for a detailed d
 
 Contributions should follow the branch-per-feature workflow and include clear commit messages (use prefixes like `feat:`, `fix:`, `style:`, or `docs:`). Please open a PR for review and testing before merging to the main branch.
 
+## Editing & Customization
+
+- **Buttons (UI)**: edit the sign-in buttons in [public/index.html](public/index.html#L1). The two buttons are `#signinGoogle` and `#signinMicrosoft` inside the header's `.auth-controls` element. Change label text or classes there.
+
+- **Button behavior (client-side)**: modify the click handlers and simulated responses in [public/script.js](public/script.js#L1). The `testSignIn(provider)` function (or `startOauth(provider)` if you restore OAuth) controls what happens on click. To restore real OAuth, wire the handlers to `startOauth('google')` / `startOauth('microsoft')`.
+
+- **Redirect pages**: the small landing pages are [public/redirect_google.html](public/redirect_google.html) and [public/redirect_microsoft.html](public/redirect_microsoft.html). They perform a 1s meta-refresh to the external site; edit the copy or destination URL inside these files if desired.
+
+- **Theme / colors**: color variables live at the top of [public/style.css](public/style.css#L1). Change `--bg`, `--panel-bg`, `--text`, `--accent`, and `--send` to tune the palette. The default theme is set in [public/script.js](public/script.js#L1) (`loadTheme()` uses localStorage key `ui_theme`). To default to dark again, set the default in `loadTheme()`.
+
+- **Avatars & icons**: avatar styles are in [public/style.css](public/style.css#L1) under `.message .avatar`. Update `color`, `background`, or border-radius to change their appearance. Emoji avatars are rendered as text; set `color` for contrast.
+
+- **Backend tools**: server-side MCP tools live in `api/mcp.py` and the message handler is available as the `handle_message` tool. If you add new UI controls that call backend tools, ensure the POST body matches the MCP shape used by the frontend (`{ tool: 'tool_name', input: { ... } }`).
+
+- **Local testing**: run the quick test harness:
+
+```bash
+python -m pip install -r requirements.txt
+python test_local.py
+# then open http://localhost:3000 (or the printed URL)
+```
+
+- **Committing & pushing**: recommended commit pattern:
+
+```bash
+git checkout -b feat/your-feature
+git add <files>
+git commit -m "feat: brief description"
+git push origin HEAD:copilot/integrate-oauth-email-login
+```
+
+- **Restoring OAuth**: if you want to re-enable OAuth flows, revert the test handlers in `public/script.js` to call `startOauth(provider)` and re-enable server-side OAuth code in `oauth_manager.py` and any `api/oauth_*.py` callbacks. Also update provider redirect URIs in your OAuth provider console to point at your deployed callback endpoints (e.g., `/api/oauth_google`).
+
+These notes give a quick map to the most commonly-edited parts of the app. If you want, I can add a short `DEVELOPING.md` with the same content and a small checklist for PRs.
+
 ## Editing Test Sign-in Buttons
 
 These buttons in the UI are currently wired as local test buttons (they do not perform OAuth). To edit them or change their behavior:
