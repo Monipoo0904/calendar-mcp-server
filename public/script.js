@@ -58,7 +58,7 @@ function setTheme(t){
 }
 
 function loadTheme(){
-  const t = localStorage.getItem('ui_theme') || 'dark';
+  const t = localStorage.getItem('ui_theme') || 'light';
   setTheme(t);
 }
 

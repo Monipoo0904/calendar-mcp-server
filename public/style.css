@@ -5,34 +5,32 @@ Developer notes (public/style.css)
 - Keep color contrast in mind and test with Lighthouse/axe for accessibility.
 */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-:root{--bg:#071023;--card:#071429;--muted:#9fb0c1;--accent:#3ddc84;--glass:rgba(255,255,255,0.03);--bubble-grad:linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01));--send:#3ddc84;--panel-bg:rgba(255,255,255,0.02);--msg-hover-shadow: 0 10px 30px rgba(2,6,23,0.5)}
-/* Light theme overrides (Coolors palette) */
-[data-theme="light"]{
-  /* Palette (tuned for higher contrast): #e6e0d7 #7a6f65 #f1e7dc #b99d8e #e3d5ca */
-  --bg: linear-gradient(180deg,#e6e0d7,#f1e7dc);
+:root{
+  /* Default: lighter palette */
+  --bg: linear-gradient(180deg,#f7f3ee,#fbf7f3);
   --card: #efe6dc;
-  --muted: #7a6f65; /* darker muted for subtitles/meta */
+  --muted: #6b6b6b;
   --accent: #b99d8e;
-  --glass: rgba(237,237,233,0.8);
-  --bubble-grad: linear-gradient(180deg,#f3e9df,#e9dfd6);
+  --glass: rgba(255,255,255,0.9);
+  --bubble-grad: linear-gradient(180deg,#f7f3ee,#efe6dc);
   --send: #c7a892;
-  --panel-bg: #fbf7f3; /* slightly off-white to reduce glare */
-  --text: #2b2b2b; /* primary text color */
-  --msg-hover-shadow: 0 12px 30px rgba(0,0,0,0.10);
+  --panel-bg: #ffffff;
+  --msg-hover-shadow: 0 12px 30px rgba(0,0,0,0.06);
+  --text: #222222;
   color-scheme: light;
-} 
+}
 
-/* Make typed text and UI readable in light theme */
-[data-theme="light"] body { color: var(--text); }
-[data-theme="light"] .composer textarea{
+/* Make typed text and UI readable by default (light) */
+body { color: var(--text); }
+.composer textarea{
   color: #1f1f1f;
   background: #ffffff;
-  border-color: rgba(0,0,0,0.08);
+  border-color: rgba(0,0,0,0.06);
 }
-[data-theme="light"] .composer textarea::placeholder{ color: rgba(0,0,0,0.60); }
-[data-theme="light"] .message .bubble{ color: #2b2b2b; }
-[data-theme="light"] .help{ color: #616161; }
-[data-theme="light"] .messages{border:1px solid rgba(0,0,0,0.06);box-shadow:0 8px 18px rgba(0,0,0,0.04)}
+.composer textarea::placeholder{ color: rgba(0,0,0,0.48); }
+.message .bubble{ color: var(--text); }
+.help{ color: #616161; }
+.messages{border:1px solid rgba(0,0,0,0.06);box-shadow:0 8px 18px rgba(0,0,0,0.04)}
 *{box-sizing:border-box}
 body{margin:0;font-family:Inter,Helvetica,Arial,sans-serif;background:var(--bg);color:#e6eef5;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;transition:background 320ms ease,color 320ms ease}
 .chat{width:min(900px,96%);background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:14px;padding:18px;box-shadow:0 10px 40px rgba(2,6,23,0.07);border:1px solid rgba(255,255,255,0.02);overflow:hidden}
