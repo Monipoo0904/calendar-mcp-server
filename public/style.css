@@ -8,6 +8,8 @@ Developer notes (public/style.css)
  - Composer and controls
  - Helpers (spinner, typing dots)
 */
+/* Accessibility helpers */
+.visually-hidden{position:absolute!important;height:1px;width:1px;overflow:hidden;clip:rect(1px,1px,1px,1px);white-space:nowrap;border:0;padding:0;margin:-1px}
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 :root{
   /* Default: lighter palette */
