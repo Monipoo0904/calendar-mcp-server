@@ -52,6 +52,10 @@ body{margin:0;font-family:Inter,Helvetica,Arial,sans-serif;background:var(--bg);
 .message.enter{opacity:0;transform:translateY(10px)}
 .message:hover{transform:translateY(-4px);box-shadow:var(--msg-hover-shadow)}
 .message .avatar{width:40px;height:40px;border-radius:8px;display:grid;place-items:center;background:rgba(255,255,255,0.02);font-size:18px}
+
+/* Ensure avatar icons (emoji) are rendered in high-contrast black for readability */
+.message .avatar{color:#000}
+.message.bot .avatar{color:#000}
 .message .bubble{position:relative;max-width:78%;padding:12px;border-radius:12px;background:var(--bubble-grad);backdrop-filter:blur(6px);color:inherit;box-shadow:0 6px 18px rgba(2,6,23,0.06);transition:background 200ms ease}
 .message .bubble .text{white-space:pre-wrap}
 .message .bubble .meta{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:0.78rem;color:var(--muted)}
