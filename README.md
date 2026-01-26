@@ -100,6 +100,22 @@ For quick editing, here are the exact file locations and line ranges for common 
 
 Use these links when making small edits; they point directly to the relevant lines in the workspace.
 
+### Natural-language examples shown in the UI
+
+The chat UI displays example inputs to help users. You can edit these exact lines in the UI files below:
+
+- Welcome/warmup message (shown as the first bot message): [public/script.js](public/script.js) — look for the `addLocalMessage(...)` call that contains the welcome text.
+- Bottom help line (short examples shown under the composer): [public/index.html](public/index.html) — edit the `p.help` paragraph.
+
+Current example strings (copy/paste into tests or README):
+
+ - "Add Birthday on 2026-02-01"
+ - "Add Meeting March 5 about planning"
+ - "Add Lunch tomorrow"
+ - Shorthand: `add:Title|YYYY-MM-DD|Desc`
+
+Edit those files to change wording, add more samples, or localize the text.
+
 ## Editing Test Sign-in Buttons
 
 These buttons in the UI are currently wired as local test buttons (they do not perform OAuth). To edit them or change their behavior:
