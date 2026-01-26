@@ -29,7 +29,7 @@ Developer notes (public/style.css)
 /* Make typed text and UI readable by default (light) */
 body { color: var(--text); }
 .composer textarea{
-  color: #1f1f1f;
+  color: #000000;
   background: #ffffff;
   border-color: rgba(0,0,0,0.06);
 }
@@ -69,14 +69,36 @@ body{margin:0;font-family:Inter,Helvetica,Arial,sans-serif;background:var(--bg);
 .message .copy{opacity:0;transition:opacity 160ms ease}
 .message:hover .copy{opacity:1}
 .message.user{justify-content:flex-end}
-.message.user .bubble{background:linear-gradient(135deg,rgba(61,220,132,0.12),rgba(61,200,140,0.08));color:#0b2b1f;border-bottom-right-radius:6px;border-bottom-left-radius:12px}
-[data-theme="light"] .message.user .bubble{background:linear-gradient(135deg,rgba(213,189,175,0.26),rgba(227,213,202,0.18));color:#3b2b26}
+.message.user .bubble{background:linear-gradient(135deg,rgba(61,220,132,0.12),rgba(61,200,140,0.08));color:#000;border-bottom-right-radius:6px;border-bottom-left-radius:12px}
+[data-theme="light"] .message.user .bubble{background:linear-gradient(135deg,rgba(213,189,175,0.26),rgba(227,213,202,0.18));color:#000}
 .message.user .avatar{order:2}
 .message.bot .avatar{order:0}
 .message.bot .bubble{ color: #000; }
-.composer{display:flex;gap:8px;align-items:end}
-.composer textarea{flex:1;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);color:inherit;resize:none;overflow:hidden;font-size:0.95rem}
-.composer button{display:grid;place-items:center;width:44px;height:44px;padding:8px;border-radius:10px;border:0;background:var(--send);color:#042017}
+.composer{display:flex;gap:0;align-items:center}
+.composer textarea{
+  flex:1;
+  padding:12px;
+  border-radius:12px 0 0 12px;
+  border:1px solid rgba(0,0,0,0.14);
+  border-right:0;
+  background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);
+  color:#000;
+  resize:none;
+  overflow:hidden;
+  font-size:0.95rem;
+}
+.composer button{
+  display:grid;
+  place-items:center;
+  width:44px;
+  height:44px;
+  padding:8px;
+  border-radius:0 10px 10px 0;
+  border:1px solid rgba(0,0,0,0.14);
+  border-left:1px solid rgba(0,0,0,0.14);
+  background:var(--send);
+  color:#042017;
+}
 .composer button svg{display:block}
 .composer-field{position:relative;flex:1}
 .composer-tooltip{position:absolute;left:0;bottom:calc(100% + 10px);width:min(520px,92%);background:var(--panel-bg);color:var(--text);border:1px solid rgba(0,0,0,0.08);padding:10px 12px;border-radius:10px;box-shadow:0 14px 30px rgba(16,24,40,0.08);opacity:0;transform:translateY(6px);transition:opacity 180ms ease, transform 180ms ease;pointer-events:none;z-index:40}
