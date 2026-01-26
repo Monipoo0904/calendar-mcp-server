@@ -1,0 +1,19 @@
+Vercel CLI 50.1.3
+Retrieving project…
+> Ready! Available at http://127.0.0.1:3000
+[31mNo ASGI server found. Please install either "uvicorn" or "hypercorn" (e.g. "pip install uvicorn").[0m
+Error: ASGI dev server exited before binding (code=1, signal=null)
+This error originated either by throwing inside of an async function without a catch block, or by rejecting a promise which was not handled with .catch(). The promise rejected with the reason:
+Error: ASGI dev server exited before binding (code=1, signal=null)
+    at ChildProcess.<anonymous> (/Users/moni/.npm-global/lib/node_modules/vercel/node_modules/@vercel/python/dist/index.js:4148:25)
+    at Object.onceWrapper (node:events:634:26)
+    at ChildProcess.emit (node:events:519:28)
+    at ChildProcess.emit (node:domain:488:12)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)
+Error: An unexpected error occurred!
+Error: ASGI dev server exited before binding (code=1, signal=null)
+    at ChildProcess.<anonymous> (/Users/moni/.npm-global/lib/node_modules/vercel/node_modules/@vercel/python/dist/index.js:4148:25)
+    at Object.onceWrapper (node:events:634:26)
+    at ChildProcess.emit (node:events:519:28)
+    at ChildProcess.emit (node:domain:488:12)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)
