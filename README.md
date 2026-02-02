@@ -40,6 +40,10 @@ Notes
 
   If a message isn't understood, the handler returns a short help text with examples.
 
+Time-aware adds
+- To add an event with a specific time use: "Add <Title> on YYYY-MM-DD at HH:MM" (24-hour). Example: "Add Meeting on 2026-02-01 at 14:30".
+- Shorthand with time: `add:Title|YYYY-MM-DD HH:MM|Desc`.
+
 Frontend improvements:
 
 - Chat UI now supports typing indicator, timestamps, avatars, copy-to-clipboard buttons, Shift+Enter for newlines, Enter to send, and conversation persistence in `localStorage`. The composer shows a spinner while the backend responds and disables input until a reply is received.
