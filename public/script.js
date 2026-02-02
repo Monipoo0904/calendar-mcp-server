@@ -152,7 +152,7 @@ if (chat.length){
   chat.forEach(renderMessage);
 } else {
   addLocalMessage(`Welcome! You can use short commands or natural phrases.
-Examples: "list" (show all events), "summarize", "Add Birthday on 2026-02-01", "Add Meeting March 5 about planning", "Add Lunch tomorrow", "delete:Doctor" or "delete Doctor".
+Examples: "list" (show all events), "summarize", "Add Birthday on 2026-02-01", "Add Meeting March 5 about planning", "Add Lunch tomorrow", "Add Meeting on 2026-02-01 at 14:30", "delete:Doctor" or "delete Doctor".
 Shorthand: add:Title|YYYY-MM-DD|Desc — Delete: delete:Title`, 'bot');
 }
 

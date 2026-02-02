@@ -35,12 +35,31 @@ def add_event(title: str, date: str, description: str = "") -> str:
   Date format: YYYY-MM-DD 
   """ 
   try: 
-    # Validate date format 
-    datetime.strptime(date, "%Y-%m-%d") 
-    events.append({"title": title, "date": date, "description": description}) 
-    return f"Event '{title}' added for {date}." 
+    # Accept date with optional time. Supported input formats:
+    #  - YYYY-MM-DD
+    #  - YYYY-MM-DD HH:MM
+    #  - YYYY-MM-DDTHH:MM
+    dt = None
+    for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+      try:
+        dt = datetime.strptime(date, fmt)
+        break
+      except Exception:
+        dt = None
+
+    if not dt:
+      raise ValueError("Invalid date format")
+
+    # If time component was provided, normalize storage to ISO 8601 without seconds
+    if 'T' in date or ' ' in date:
+      stored = dt.strftime("%Y-%m-%dT%H:%M")
+    else:
+      stored = dt.strftime("%Y-%m-%d")
+
+    events.append({"title": title, "date": stored, "description": description}) 
+    return f"Event '{title}' added for {stored}." 
   except ValueError: 
-    return "Invalid date format. Use YYYY-MM-DD." 
+    return "Invalid date format. Use YYYY-MM-DD or include time like 'YYYY-MM-DD 14:30'." 
 # View all events 
 @mcp.tool() 
 
@@ -119,6 +138,13 @@ def handle_message(message: str) -> str:
     m = re.search(r"(\d{4}-\d{2}-\d{2})", s)
     if m:
       return m.group(1)
+    # Try datetime with time: YYYY-MM-DDTHH:MM or YYYY-MM-DD HH:MM
+    m2 = re.search(r"(\d{4}-\d{2}-\d{2})[T ](\d{1,2}:\d{2})", s)
+    if m2:
+      date_part = m2.group(1)
+      time_part = m2.group(2)
+      # normalize to YYYY-MM-DDTHH:MM
+      return f"{date_part}T{time_part}"
     return None
   
   def find_date_in_msg(s: str):
@@ -132,8 +158,8 @@ def handle_message(message: str) -> str:
       if idx != -1:
         return parse_date_token(tok), (idx, idx + len(tok))
 
-    # ISO YYYY-MM-DD
-    m = re.search(r"(\d{4}-\d{2}-\d{2})", s_norm)
+    # ISO YYYY-MM-DD or datetime (YYYY-MM-DD HH:MM or YYYY-MM-DDTHH:MM)
+    m = re.search(r"(\d{4}-\d{2}-\d{2}(?:[T ]\d{1,2}:\d{2})?)", s_norm)
     if m:
       return m.group(1), m.span(1)
 
@@ -168,9 +194,35 @@ def handle_message(message: str) -> str:
       if mon in months:
         year = int(yr) if yr else datetime.today().year
         iso = f"{year:04d}-{months[mon]:02d}-{day:02d}"
+        # Check for a time immediately following (e.g., 'March 5 at 3pm' or 'March 5 15:30')
+        after_span_start = m.span(0)[1]
+        after = s_norm[after_span_start:after_span_start+40]
+        tmatch = re.search(r"(?:at\s*)?(\d{1,2}:?\d{0,2}\s*(?:am|pm)?)", after)
+        if tmatch:
+          traw = tmatch.group(1)
+          # normalize time
+          tt = parse_time_token(traw)
+          if tt:
+            return f"{iso}T{tt}", m.span(0)
         return iso, m.span(0)
 
     return None, None
+
+  def parse_time_token(s: str):
+    """Normalize a time token like '3pm', '3:30 pm', or '15:30' to HH:MM (24h)."""
+    s = (s or '').strip().lower()
+    m = re.match(r"^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$", s)
+    if not m:
+      return None
+    h = int(m.group(1))
+    minute = int(m.group(2)) if m.group(2) else 0
+    ampm = m.group(3)
+    if ampm:
+      if ampm == 'pm' and h < 12:
+        h += 12
+      if ampm == 'am' and h == 12:
+        h = 0
+    return f"{h:02d}:{minute:02d}"
 
   # Summaries
   if any(k in low for k in ("summarize", "summary", "what's coming", "upcoming", "brief")):
@@ -342,17 +394,44 @@ async def export_ics():
   for e in sorted(events, key=lambda x: x["date"]):
     uid = str(uuid.uuid4())
     # date in format YYYYMMDD for all-day DTSTART
-    dtstart = e["date"].replace('-', '')
     desc = e.get('description', '') or ''
-    lines.extend([
-      "BEGIN:VEVENT",
-      f"UID:{uid}",
-      f"DTSTAMP:{now}",
-      f"DTSTART;VALUE=DATE:{dtstart}",
-      f"SUMMARY:{e.get('title','')}",
-      f"DESCRIPTION:{desc}",
-      "END:VEVENT",
-    ])
+    if 'T' in e.get('date', ''):
+      # timed event: YYYY-MM-DDTHH:MM
+      try:
+        d = _dt.datetime.strptime(e['date'], '%Y-%m-%dT%H:%M')
+        dtstr = d.strftime('%Y%m%dT%H%M%S')
+        lines.extend([
+          "BEGIN:VEVENT",
+          f"UID:{uid}",
+          f"DTSTAMP:{now}",
+          f"DTSTART:{dtstr}",
+          f"SUMMARY:{e.get('title','')}",
+          f"DESCRIPTION:{desc}",
+          "END:VEVENT",
+        ])
+      except Exception:
+        # fallback to all-day
+        dtstart = e['date'].split('T',1)[0].replace('-', '')
+        lines.extend([
+          "BEGIN:VEVENT",
+          f"UID:{uid}",
+          f"DTSTAMP:{now}",
+          f"DTSTART;VALUE=DATE:{dtstart}",
+          f"SUMMARY:{e.get('title','')}",
+          f"DESCRIPTION:{desc}",
+          "END:VEVENT",
+        ])
+    else:
+      dtstart = e["date"].replace('-', '')
+      lines.extend([
+        "BEGIN:VEVENT",
+        f"UID:{uid}",
+        f"DTSTAMP:{now}",
+        f"DTSTART;VALUE=DATE:{dtstart}",
+        f"SUMMARY:{e.get('title','')}",
+        f"DESCRIPTION:{desc}",
+        "END:VEVENT",
+      ])
 
   lines.append("END:VCALENDAR")
   content = "\r\n".join(lines) + "\r\n"
