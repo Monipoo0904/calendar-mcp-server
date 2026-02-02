@@ -2,7 +2,7 @@ from mcp.server.fastmcp import FastMCP
 from typing import List, Dict 
 from datetime import datetime 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 # -----------------------------------------
@@ -321,6 +321,44 @@ async def root_index():
     if os.path.exists(index_path):
         return FileResponse(index_path, media_type="text/html")
     return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
+
+@app.get("/export.ics", include_in_schema=False)
+async def export_ics():
+  """Generate a simple iCalendar (.ics) file from in-memory `events`.
+
+  All events are exported as all-day events using their YYYY-MM-DD date.
+  """
+  import uuid
+  import datetime as _dt
+
+  lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Event Calendar MCP//EN",
+  ]
+
+  now = _dt.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+  for e in sorted(events, key=lambda x: x["date"]):
+    uid = str(uuid.uuid4())
+    # date in format YYYYMMDD for all-day DTSTART
+    dtstart = e["date"].replace('-', '')
+    desc = e.get('description', '') or ''
+    lines.extend([
+      "BEGIN:VEVENT",
+      f"UID:{uid}",
+      f"DTSTAMP:{now}",
+      f"DTSTART;VALUE=DATE:{dtstart}",
+      f"SUMMARY:{e.get('title','')}",
+      f"DESCRIPTION:{desc}",
+      "END:VEVENT",
+    ])
+
+  lines.append("END:VCALENDAR")
+  content = "\r\n".join(lines) + "\r\n"
+
+  headers = {"Content-Disposition": "attachment; filename=events.ics"}
+  return Response(content=content, media_type="text/calendar; charset=utf-8", headers=headers)
 
 
 if __name__ == "__main__":
