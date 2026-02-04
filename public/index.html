@@ -36,10 +36,10 @@
           <textarea id="input" rows="1" placeholder="" aria-label="Type a command or natural phrase, for example: Add Birthday on 2026-02-01; Add Meeting March 5 about planning; Add Lunch tomorrow" title="" aria-describedby="composerHelp composerTooltip" autocomplete="off"></textarea>
           <div id="composerTooltip" class="composer-tooltip" role="status" aria-hidden="true">
             <strong>Examples:</strong>
-            <div class="examples">Add Birthday on 2026-02-01; Add Meeting March 5 about planning; Add Lunch tomorrow; Add Meeting on 2026-02-01 at 14:30; delete:Doctor|2026-03-10 or "delete Doctor"; list (show all events)</div>
-            <div class="shorthand">Format: "Add &lt;Title&gt; on YYYY-MM-DD at HH:MM" (24-hour). Shorthand with time: <code>add:Title|YYYY-MM-DD HH:MM|Desc</code>. Delete: <code>delete:Title</code></div>
+            <div class="examples">Add Birthday on 2026-02-01; Add Meeting March 5 about planning; Add Lunch tomorrow; Add Meeting on 2026-02-01 at 14:30; Add Meeting on March 5 from 3pm to 5pm; Add Meeting on 2026-03-03 14:00-15:00; delete:Doctor or "delete Doctor"; list (show all events)</div>
+            <div class="shorthand">Format: "Add &lt;Title&gt; on YYYY-MM-DD at HH:MM" (24-hour). Time ranges: "from 3pm to 5pm" or shorthand range like "14:00-15:00". Shorthand with time: <code>add:Title|YYYY-MM-DD HH:MM|Desc</code>. Delete: <code>delete:Title</code></div>
           </div>
-          <span id="composerHelp" class="visually-hidden">Examples: Add Birthday on 2026-02-01; Add Meeting March 5 about planning; Add Lunch tomorrow; Add Meeting on 2026-02-01 at 14:30. Format: Add &lt;Title&gt; on YYYY-MM-DD at HH:MM (24-hour). Shorthand: add:Title|YYYY-MM-DD HH:MM|Desc. Delete: delete:Title. Show all events: list</span>
+          <span id="composerHelp" class="visually-hidden">Examples: Add Birthday on 2026-02-01; Add Meeting March 5 about planning; Add Lunch tomorrow; Add Meeting on 2026-02-01 at 14:30; Add Meeting on March 5 from 3pm to 5pm; Add Meeting on 2026-03-03 14:00-15:00. Format: Add &lt;Title&gt; on YYYY-MM-DD at HH:MM (24-hour). Time ranges accepted: "from 3pm to 5pm" or "14:00-15:00". Shorthand: add:Title|YYYY-MM-DD HH:MM|Desc. Delete: delete:Title. Show all events: list</span>
         </div>
         <button id="sendBtn" type="submit" aria-label="Send message">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 21L23 12L2 3v7l15 2L2 14v7z" fill="currentColor"/></svg>
@@ -47,7 +47,7 @@
         <div id="spinner" class="spinner" aria-hidden="true" hidden></div>
       </form>
 
-      <p class="help">Examples: <code>list</code> (show all events), <code>summarize</code>, or natural phrases like "Add Birthday on 2026-02-01", "Add Meeting March 5 about planning", "Add Lunch tomorrow". To delete: <code>delete:Title</code> or "delete Meeting". Shorthand: <code>add:Title|YYYY-MM-DD|Desc</code>.</p>
+      <p class="help">Examples: <code>list</code> (show all events), <code>summarize</code>, or natural phrases like "Add Birthday on 2026-02-01", "Add Meeting March 5 about planning", "Add Lunch tomorrow", or time-aware inputs like "Add Meeting on March 5 from 3pm to 5pm" and "Add Meeting on 2026-03-03 14:00-15:00". To delete: <code>delete:Title</code> or "delete Meeting". Shorthand: <code>add:Title|YYYY-MM-DD HH:MM|Desc</code>.</p>
     </main>
 
     <script src="/script.js"></script>

@@ -59,6 +59,23 @@ Files of interest:
   - `setFetching(state)` — disables composer and shows spinner while waiting for a reply
   - Theme helpers: `setTheme(t)` and `loadTheme()` manage `data-theme` attribute
 
+Developer notes — recent features and where to edit
+- Time parsing and conversational adds: see `main.py`:
+  - `handle_message(message)` implements the conversational parsing logic. Date detection and normalization happen in `find_date_in_msg()` and `parse_date_token()`; time normalization is in `parse_time_token()`.
+  - `add_event(title, date, description)` now accepts date+time formats and stores events as either `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`.
+- .ics export: the `GET /export.ics` route is defined in `main.py` and serializes the in-memory `events` list to a downloadable iCalendar file. Timed events are emitted with a `DTSTART` timestamp; date-only events are exported as `DTSTART;VALUE=DATE`.
+- UI examples and guidance: update `public/index.html` (composer tooltip, `composerHelp`) and `public/script.js` (welcome bot message) to change the examples or instructions shown to users.
+- Styling: `public/style.css` contains variables at the top (`:root`) and the `auth-button` class used by the Connect and Export buttons.
+
+Suggested edit flow
+1. Update parsing logic in `main.py` and write unit tests for `find_date_in_msg()` and `parse_time_token()`.
+2. Update UI examples in `public/index.html` and `public/script.js` to reflect new behaviors.
+3. Adjust style in `public/style.css` if you change control sizing or spacing.
+4. If adding timezone or end-time support, update the `.ics` exporter and document timezone expectations in the README.
+
+Notes about deployment
+- `api/mcp.py` is a serverless handler continuity helper — use it if deploying to Vercel. If you introduce OAuth flows, ensure the provider redirect URIs match your deployment host and secure client credentials (do not commit them to the repo).
+
 Tips:
 - Avatars: change the emoji strings in `renderMessage` and `showTyping`.
 - Adding UI elements: update the HTML markup and corresponding CSS classes; keep `messages` container as `role="log" aria-live="polite"` for screen readers.

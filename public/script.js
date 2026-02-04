@@ -152,8 +152,8 @@ if (chat.length){
   chat.forEach(renderMessage);
 } else {
   addLocalMessage(`Welcome! You can use short commands or natural phrases.
-Examples: "list" (show all events), "summarize", "Add Birthday on 2026-02-01", "Add Meeting March 5 about planning", "Add Lunch tomorrow", "Add Meeting on 2026-02-01 at 14:30", "delete:Doctor" or "delete Doctor".
-Format: "Add <Title> on YYYY-MM-DD at HH:MM" (24-hour). Shorthand with time: add:Title|YYYY-MM-DD HH:MM|Desc`, 'bot');
+Examples: "list" (show all events), "summarize", "Add Birthday on 2026-02-01", "Add Meeting March 5 about planning", "Add Lunch tomorrow", "Add Meeting on 2026-02-01 at 14:30", "Add Meeting on March 5 from 3pm to 5pm", "Add Meeting on 2026-03-03 14:00-15:00", "delete:Doctor" or "delete Doctor".
+Format: "Add <Title> on YYYY-MM-DD at HH:MM" (24-hour). Time ranges supported: "from 3pm to 5pm" or shorthand "14:00-15:00". Shorthand with time: add:Title|YYYY-MM-DD HH:MM|Desc`, 'bot');
 }
 
 // accessibility: focus input on load

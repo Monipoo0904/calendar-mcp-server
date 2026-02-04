@@ -44,6 +44,26 @@ Time-aware adds
 - To add an event with a specific time use: "Add <Title> on YYYY-MM-DD at HH:MM" (24-hour). Example: "Add Meeting on 2026-02-01 at 14:30".
 - Shorthand with time: `add:Title|YYYY-MM-DD HH:MM|Desc`.
 
+Recent changes (developer notes)
+- Time parsing: the chat parser now recognizes date-only and date+time tokens (examples above). It accepts `YYYY-MM-DD`, `YYYY-MM-DD HH:MM`, and `YYYY-MM-DDTHH:MM` (24-hour). Also supports month-name dates with times like "March 5 at 3pm".
+- ICS export: a new endpoint `GET /export.ics` builds a minimal iCalendar file from in-memory events. Events with times produce timed `DTSTART` values; date-only events export as all-day `DTSTART;VALUE=DATE`.
+- End-time ranges & DTEND: the parser now recognizes simple time ranges (e.g. "3pm-5pm", "from 3pm to 5pm") and stores an `end` value for events when present. The `.ics` exporter emits a `DTEND` for such events when possible.
+
+Where to edit the code (quick pointers)
+- `main.py` — core tools and parsing:
+  - `add_event(title, date, description)` — validation and storage (now accepts times).
+  - `handle_message(message)` — conversational parser; date detection lives in `find_date_in_msg()` and time normalization in `parse_time_token()`.
+  - `/export.ics` route — builds and returns the .ics file.
+- `public/index.html` — UI: composer, tooltip/examples, auth buttons, `Export .ics` link.
+- `public/script.js` — welcome message, test sign-in handlers, and network calls to `/api/mcp`.
+- `public/style.css` — visual styling for composer, auth buttons, and header controls.
+- `api/mcp.py` — serverless wrapper used for Vercel deployments (keeps CORS handling and tool call shaping).
+
+If you plan to extend functionality:
+- Add end-time parsing (DTEND) and update `.ics` generation to include `DTEND`.
+- Add timezone handling (store timezone or convert to UTC); iCalendar events benefit from explicit TZ or UTC timestamps.
+- Add unit tests for `find_date_in_msg()` and `parse_time_token()` to validate parsing edge cases.
+
 Frontend improvements:
 
 - Chat UI now supports typing indicator, timestamps, avatars, copy-to-clipboard buttons, Shift+Enter for newlines, Enter to send, and conversation persistence in `localStorage`. The composer shows a spinner while the backend responds and disables input until a reply is received.
