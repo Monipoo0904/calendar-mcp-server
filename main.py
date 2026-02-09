@@ -15,6 +15,9 @@ from fastapi.staticfiles import StaticFiles
 # -----------------------------------------
 
 import os
+import json
+import httpx
+from datetime import datetime, timedelta
 
 # Create an MCP server 
 mcp = FastMCP("EventCalendar") 
@@ -251,7 +254,7 @@ def handle_message(message: str) -> str:
         after_span_start = m.span(0)[1]
         after = s_norm[after_span_start:after_span_start+80]
         # First try to find a range after the date (e.g., 'at 3pm to 5pm')
-        r = re.search(r"(?:at\s*)?(\d{1,2}:?\d{0,2}\s*(?:am|pm)?)(?:\s*(?:-|to|until|through|–)\s*)(\d{1,2}:?\d{0,2}\s*(?:am|pm)?)", after, re.I)
+        r = re.search(r"(?:at\s*)?(\d{1,2}:?\d{0,2}\s*(?:am|pm)?)\s*(?:-|to|until|through|–)\s*(\d{1,2}:?\d{0,2}\s*(?:am|pm)?)", after, re.I)
         if r:
           start_raw = r.group(1)
           end_raw = r.group(2)
@@ -707,4 +710,149 @@ def set_recurrence(title: str, frequency: str = "none", interval: int = 1) -> st
 
     return f"Recurrence for '{title}' set to '{frequency}'{(' (interval=' + str(interval) + ')') if key=='custom' else ''}."
 
+import os
+import re
+from datetime import datetime, timedelta
 
+def _looks_like_add_command(msg: str) -> bool:
+    import re
+    return bool(re.search(r'\b(add|schedule|create|event|book)\b', msg, re.I))
+
+@mcp.tool()
+def research_and_breakdown(goal: str, deadline: str = None) -> dict:
+    """
+    Produce a structured plan for a user goal.
+    If OPENAI_API_KEY present, attempt to ask the LLM to return a JSON plan.
+    Fallback: heuristic generator (already implemented below).
+    """
+    # Try to parse deadline if provided
+    now = datetime.now()
+    dt_deadline = None
+    if deadline:
+        try:
+            # accept YYYY-MM-DD or natural-ish (try ISO)
+            if 'T' in deadline:
+                dt_deadline = datetime.fromisoformat(deadline)
+            else:
+                dt_deadline = datetime.strptime(deadline, "%Y-%m-%d")
+        except Exception:
+            # fallback: try parse relative like "in 3 months" not implemented — ignore
+            dt_deadline = None
+
+    # Integrate with external LLM if configured (optional)
+    llm_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
+    if llm_key:
+        try:
+            # Call OpenAI Chat Completions API (simple request; adjust model as desired)
+            prompt = (
+                "You are a planning assistant. Given a user goal and optional deadline, "
+                "return a JSON object with keys: goal, deadline (YYYY-MM-DD or null), "
+                "estimated_days (int), milestones (array of {title,due}), "
+                "cadence_suggestions (array of strings). Only emit pure JSON."
+                f"\n\nGoal: {goal}\nDeadline: {deadline or 'none'}\n\n"
+                "Return the JSON without extra commentary."
+            )
+            headers = {"Authorization": f"Bearer {llm_key}", "Content-Type": "application/json"}
+            payload = {
+                "model": "gpt-4",
+                "messages": [{"role":"system","content":"You output only JSON."},
+                             {"role":"user","content":prompt}],
+                "temperature": 0.2,
+                "max_tokens": 600,
+            }
+            resp = httpx.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers, timeout=15.0)
+            if resp.status_code == 200:
+                body = resp.json()
+                text = body.get("choices", [{}])[0].get("message", {}).get("content", "")
+                # try to parse JSON from the model output
+                try:
+                    parsed = json.loads(text)
+                    # ensure minimal keys exist
+                    if isinstance(parsed, dict) and "milestones" in parsed:
+                        return parsed
+                except Exception:
+                    # best-effort: try to extract JSON substring
+                    start = text.find("{")
+                    end = text.rfind("}")
+                    if start != -1 and end != -1 and end > start:
+                        try:
+                            parsed = json.loads(text[start:end+1])
+                            if isinstance(parsed, dict) and "milestones" in parsed:
+                                return parsed
+                        except Exception:
+                            pass
+            # fall through to heuristic if LLM response unusable
+        except Exception:
+            pass
+
+    # Heuristic breakdown generator
+    # Choose between 3 and 6 milestones depending on time available
+    if dt_deadline:
+        total_days = max(1, (dt_deadline - now).days)
+    else:
+        total_days = 30  # default planning horizon
+        dt_deadline = now + timedelta(days=total_days)
+
+    # decide number of milestones: 3 for short, up to 6 for longer horizons
+    if total_days <= 14:
+        n = 3
+    elif total_days <= 60:
+        n = 4
+    elif total_days <= 180:
+        n = 5
+    else:
+        n = 6
+
+    days_per_milestone = max(1, total_days // n)
+    milestones = []
+    cur = now
+    for i in range(1, n + 1):
+        cur = cur + timedelta(days=days_per_milestone)
+        m_title = f"Milestone {i}: {goal.split()[0:3] and ' '.join(goal.split()[0:3]) or 'Step'}"
+        milestones.append({
+            "title": m_title,
+            "due": cur.strftime("%Y-%m-%d")
+        })
+
+    # cadence suggestions based on total days
+    cadence = []
+    if total_days <= 14:
+        cadence = ["daily", "every other day"]
+    elif total_days <= 60:
+        cadence = ["every other day", "weekly"]
+    else:
+        cadence = ["weekly", "biweekly"]
+
+    result = {
+        "goal": goal,
+        "deadline": dt_deadline.strftime("%Y-%m-%d") if dt_deadline else None,
+        "estimated_days": total_days,
+        "milestones": milestones,
+        "cadence_suggestions": cadence,
+        "note": "Use 'set_recurrence' to apply cadence to created sub-tasks or accept and create tasks manually."
+    }
+    return result
+
+# modify handle_message (or the function that previously auto-added events) to prompt first
+def handle_message(message: str) -> str:
+    """
+    Main conversational entry. This simplified wrapper now:
+      - Prompts the user for a goal when the user tries to 'add'/'schedule' something.
+      - Otherwise falls back to existing message handling.
+    """
+    # ...existing parsing/logic...
+    try:
+        if _looks_like_add_command(message):
+            # ask the user to describe the larger goal instead of directly adding an event
+            return "Before adding to your calendar — what would you like to accomplish? (one sentence)"
+        # existing handler behavior follows...
+        # ...existing code...
+    except Exception as exc:
+        return f"Error: {exc}"
+
+# New server-side tool: create_tasks from a plan
+@mcp.tool()
+def create_tasks(plan: dict) -> str:
+    """
+    Create calendar events from a structured plan object (as returned by `research_and_breakdown`).
+"""

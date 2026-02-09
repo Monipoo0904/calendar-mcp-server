@@ -362,3 +362,122 @@ function showRecurrencePrompt(title){
     });
   });
 }
+
+// Client helpers for the project planning flow
+
+async function submitProjectGoal(goalText) {
+  // prompt user for deadline
+  const deadline = prompt('When would you like this done by? (YYYY-MM-DD or leave blank)');
+  if (deadline === null) return; // user canceled
+  addLocalMessage(goalText, 'user');
+  addLocalMessage('Working on a plan…', 'bot');
+
+  try {
+    const res = await fetch('/api/mcp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tool: 'research_and_breakdown', input: { goal: goalText, deadline } })
+    });
+    const data = await res.json();
+    if (res.ok && data.result) {
+      const plan = data.result;
+      // render plan as bot message with milestones and cadence suggestions
+      const lines = [];
+      lines.push(`Plan for "${plan.goal}" (deadline: ${plan.deadline || 'not specified'}):`);
+      plan.milestones.forEach((m, i) => lines.push(`${i+1}. ${m.title} — due ${m.due}`));
+      lines.push('Suggested cadences: ' + (plan.cadence_suggestions || []).join(', '));
+      addLocalMessage(lines.join('\n'), 'bot');
+
+      // show quick action: "Create tasks" prompt (simple)
+      const createBtn = document.createElement('button');
+      createBtn.textContent = 'Create tasks from plan';
+      createBtn.className = 'copy';
+      createBtn.addEventListener('click', async () => {
+        // call server tool to create tasks from the plan
+        setFetching(true);
+        try {
+          const resp = await fetch('/api/mcp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tool: 'create_tasks', input: plan })
+          });
+          const body = await resp.json().catch(()=>({}));
+          if (resp.ok && body.result) {
+            addLocalMessage(body.result, 'bot');
+          } else {
+            addLocalMessage('Failed to create tasks: ' + (body.error || JSON.stringify(body)), 'bot');
+          }
+        } catch (err) {
+          addLocalMessage('Network error creating tasks: ' + err.message, 'bot');
+        } finally {
+          setFetching(false);
+        }
+       });
+      // append to messages area
+      const wrapper = document.createElement('div');
+      wrapper.className = 'message bot';
+      wrapper.appendChild(createBtn);
+      messages.appendChild(wrapper);
+      messages.scrollTop = messages.scrollHeight;
+    } else {
+      addLocalMessage('Failed to generate plan: ' + (data.error || JSON.stringify(data)), 'bot');
+    }
+  } catch (err) {
+    addLocalMessage('Network error when generating plan: ' + err.message, 'bot');
+  }
+}
+
+// wire quick shortcut: when bot asks "what would you like to accomplish?" show a small quick-prompt UI
+function interceptGoalPrompt(text) {
+  // called after adding a bot message; keep it tiny: show a "Start Project" suggestion that when clicked prompts user
+  if (/what would you like to accomplish\?/i.test(text)) {
+    const quick = document.createElement('div');
+    quick.className = 'quick-actions';
+    quick.innerHTML = `<button class="copy" id="startProjectBtn">Start Project</button>`;
+    messages.appendChild(quick);
+    document.getElementById('startProjectBtn').addEventListener('click', () => {
+      const goal = prompt('Briefly describe the goal you want to accomplish (one sentence):');
+      if (!goal) return;
+      submitProjectGoal(goal);
+      quick.remove();
+    });
+    messages.scrollTop = messages.scrollHeight;
+  }
+}
+
+// modify addLocalMessage to call interceptGoalPrompt when bot messages are added
+const _addLocalMessage = addLocalMessage;
+addLocalMessage = function(text, who) {
+  _addLocalMessage(text, who);
+  if (who === 'bot') interceptGoalPrompt(text);
+};
+
+/*
+Project-planning flow developer notes
+- Purpose: lightweight client-side helpers that let the bot prompt the user for a high-level goal,
+  call the server tool `research_and_breakdown(goal, deadline)` to get a structured plan,
+  and optionally call `create_tasks(plan)` server tool to create calendar tasks.
+- Key client functions to edit:
+  - submitProjectGoal(goalText)
+      * Prompts user for a deadline, sends the goal to /api/mcp tool 'research_and_breakdown'
+      * Renders the returned plan and exposes a "Create tasks from plan" quick action.
+      * To change where the deadline is requested (inline UI vs prompt), modify this function.
+  - interceptGoalPrompt(text)
+      * Detects the bot prompt "What would you like to accomplish?" and injects a small quick-action
+        button that opens the project flow. Edit the regex or UI here to change trigger text or styling.
+  - The quick "Create tasks" action calls the server-side tool 'create_tasks' with the plan payload.
+      * Server-side: see main.py tools `research_and_breakdown` and `create_tasks`.
+      * To change persistence (DB/KV), update the server-side `create_tasks` implementation.
+- Extensibility notes:
+  - If integrating an LLM client on the browser, prefer doing that server-side and keep the client minimal.
+  - To add UX improvements (deadline datepicker, cadence selector), replace the prompt() calls with
+    a small modal/dialog component and bind its values into the payload sent to /api/mcp.
+  - Client-side validation: submitProjectGoal currently assumes the server will validate the deadline string.
+    Add client-side validation for YYYY-MM-DD or use a date picker.
+- Files to update for full flow:
+  - server: main.py (tools: research_and_breakdown, create_tasks, set_recurrence)
+  - client: public/script.js (submitProjectGoal, interceptGoalPrompt)
+  - UI: public/index.html (optional UI elements for project flow)
+  - docs: README.md / DEVELOPING.md (update instructions if you change tool names)
+
+*/
