@@ -27,7 +27,10 @@ app = FastAPI()
 
 # In-memory storage for events 
 # Each event is a dict: {"title": str, "date": str, "description": str} 
-events: List[Dict] = [] 
+events: List[Dict] = []
+
+# In-memory goal flow state (very simple, resets on restart)
+pending_goal = {"goal": None, "deadline": None, "cadence": None}
 
 # Add an event 
 @mcp.tool() 
@@ -298,6 +301,73 @@ def handle_message(message: str) -> str:
         h = 0
     return f"{h:02d}:{minute:02d}"
 
+  def normalize_deadline(text: str):
+    """Accept YYYY-MM-DD, 'today/tomorrow', or month-name dates."""
+    # Try explicit date tokens first
+    dt = parse_date_token(text)
+    if dt:
+      return dt.split("T", 1)[0]
+    # Try month-name or embedded date
+    d, _, _ = find_date_in_msg(text)
+    if d:
+      return d.split("T", 1)[0]
+    # Try YYYY-MM-DD anywhere
+    m = re.search(r"(\d{4}-\d{2}-\d{2})", text)
+    if m:
+      return m.group(1)
+    return None
+
+  def normalize_cadence(text: str):
+    t = (text or "").lower()
+    if "every other day" in t:
+      return "every_other_day"
+    if "every two weeks" in t or "biweekly" in t:
+      return "biweekly"
+    if "weekdays" in t or "workdays" in t:
+      return "weekdays"
+    if "weekly" in t:
+      return "weekly"
+    if "monthly" in t:
+      return "monthly"
+    if "daily" in t or "every day" in t:
+      return "daily"
+    if "custom" in t:
+      return "custom"
+    return None
+
+  def format_plan(plan: dict, cadence_choice: str = None) -> str:
+    if not isinstance(plan, dict):
+      return str(plan)
+    lines = []
+    lines.append(f'Plan for "{plan.get("goal","(goal)")}" (deadline: {plan.get("deadline") or "not specified"}):')
+    for i, m in enumerate(plan.get("milestones", []), start=1):
+      lines.append(f'{i}. {m.get("title","Milestone")} — due {m.get("due","")}')
+    if plan.get("cadence_suggestions"):
+      lines.append("Suggested cadences: " + ", ".join(plan["cadence_suggestions"]))
+    if cadence_choice:
+      lines.append("Chosen cadence: " + cadence_choice.replace("_", " "))
+    return "\n".join(lines)
+
+  # --- Project planning flow: deadline step ---
+  if pending_goal["goal"] and pending_goal["deadline"] is None:
+    if low in ("skip", "none", "no"):
+      pending_goal["deadline"] = None
+    else:
+      pending_goal["deadline"] = normalize_deadline(msg)
+
+    return "How often would you like to work on this? (daily / every other day / weekly / biweekly / weekdays / monthly / custom)"
+
+  # --- Project planning flow: cadence step ---
+  if pending_goal["goal"] and pending_goal["deadline"] is not None and pending_goal["cadence"] is None:
+    cad = normalize_cadence(msg)
+    pending_goal["cadence"] = cad or "unspecified"
+    plan = research_and_breakdown(pending_goal["goal"], pending_goal["deadline"])
+    # reset state
+    pending_goal["goal"] = None
+    pending_goal["deadline"] = None
+    pending_goal["cadence"] = None
+    return format_plan(plan, cad)
+
   # Summaries
   if any(k in low for k in ("summarize", "summary", "what's coming", "upcoming", "brief")):
     return summarize_events()
@@ -327,7 +397,6 @@ def handle_message(message: str) -> str:
     description = parts[2].strip() if len(parts) > 2 else ""
     return add_event(title, date, description)
 
-  # Conversational adds: try to find a date token anywhere and treat text around it as the title/description.
   verb_match = re.match(r'^(?:add|create|schedule)\b\s*(.*)$', msg, re.I)
   if verb_match:
     rest = verb_match.group(1).strip()
@@ -376,14 +445,19 @@ def handle_message(message: str) -> str:
     title = m.group('title').strip()
     return delete_event(title)
 
-  # Fallback help text
+  # --- If it's not a calendar command, treat it as a goal and ask for deadline ---
+  if msg:
+    pending_goal["goal"] = msg
+    pending_goal["deadline"] = None
+    pending_goal["cadence"] = None
+    return "Great — when would you like this done by? (YYYY-MM-DD, a date like 'March 5', or 'skip')"
+
+  # Fallback help text (should rarely hit)
   return (
-    "Sorry, I didn't understand. Try conversational commands like:\n"
+    "Sorry, I didn't understand. Try commands like:\n"
     "- \"Add Birthday on 2026-02-01\"\n"
-    "- \"Create Meeting on 2026-03-03 about planning\"\n"
-    "- \"List events on 2026-03-03\" or \"What's on 2026-03-03?\"\n"
+    "- \"List events on 2026-03-03\"\n"
     "- \"Summarize upcoming\"\n"
-    "You can also use the shorthand: add:Title|YYYY-MM-DD|Desc, delete:Title, list, summarize."
   )
 
 
@@ -832,23 +906,6 @@ def research_and_breakdown(goal: str, deadline: str = None) -> dict:
         "note": "Use 'set_recurrence' to apply cadence to created sub-tasks or accept and create tasks manually."
     }
     return result
-
-# modify handle_message (or the function that previously auto-added events) to prompt first
-def handle_message(message: str) -> str:
-    """
-    Main conversational entry. This simplified wrapper now:
-      - Prompts the user for a goal when the user tries to 'add'/'schedule' something.
-      - Otherwise falls back to existing message handling.
-    """
-    # ...existing parsing/logic...
-    try:
-        if _looks_like_add_command(message):
-            # ask the user to describe the larger goal instead of directly adding an event
-            return "Before adding to your calendar — what would you like to accomplish? (one sentence)"
-        # existing handler behavior follows...
-        # ...existing code...
-    except Exception as exc:
-        return f"Error: {exc}"
 
 # New server-side tool: create_tasks from a plan
 @mcp.tool()
