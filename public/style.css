@@ -28,10 +28,11 @@ Developer notes (public/style.css)
 
 /* Make typed text and UI readable by default (light) */
 body { color: var(--text); }
-.composer textarea{
-  color: #000000;
-  background: #ffffff;
-  border-color: rgba(0,0,0,0.06);
+.composer textarea,
+#input {
+  overflow-y: auto; /* allow scrolling */
+  resize: none;
+  min-height: 44px;
 }
 .composer textarea::placeholder{ color: rgba(0,0,0,0.48); }
 .message .bubble{ color: var(--text); }
@@ -104,7 +105,25 @@ body{margin:0;font-family:Inter,Helvetica,Arial,sans-serif;background:var(--bg);
 }
 .composer button svg{display:block}
 .composer-field{position:relative;flex:1}
-.composer-tooltip{position:absolute;left:0;bottom:calc(100% + 10px);width:min(520px,92%);background:var(--panel-bg);color:var(--text);border:1px solid rgba(0,0,0,0.08);padding:10px 12px;border-radius:10px;box-shadow:0 14px 30px rgba(16,24,40,0.08);opacity:0;transform:translateY(6px);transition:opacity 180ms ease, transform 180ms ease;pointer-events:none;z-index:40}
+.composer-tooltip{
+  position:absolute;
+  left:0;
+  bottom:calc(100% + 10px);
+  width:min(520px,92%);
+  background:var(--panel-bg);
+  color:var(--text);
+  border:1px solid rgba(0,0,0,0.08);
+  padding:10px 12px;
+  border-radius:10px;
+  box-shadow:0 14px 30px rgba(16,24,40,0.08);
+  opacity:0;
+  transform:translateY(6px);
+  transition:opacity 180ms ease, transform 180ms ease;
+  pointer-events:none;
+  z-index:40;
+  max-height: 220px; /* limit height so it can scroll */
+  overflow-y: auto;
+}
 .composer-tooltip .examples{margin-top:6px}
 .composer-tooltip .shorthand{margin-top:8px;font-size:0.85rem;color:var(--muted)}
 .composer-field:focus-within .composer-tooltip{opacity:1;transform:translateY(0);pointer-events:auto}
