@@ -141,9 +141,13 @@ function setFetching(state){
   }
 }
 
-function autoResize(){
+function autoResize() {
+  // keep it scrollable; only grow up to a max height
   input.style.height = 'auto';
-  input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+  const max = 160; // px
+  const next = Math.min(input.scrollHeight, max);
+  input.style.height = `${next}px`;
+  input.style.overflowY = input.scrollHeight > max ? 'auto' : 'hidden';
 }
 
 // Load existing messages
