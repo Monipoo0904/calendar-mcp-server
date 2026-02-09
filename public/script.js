@@ -6,7 +6,7 @@ Developer notes (public/script.js)
   - addLocalMessage(text, who): appends to `chat[]` and persists to localStorage (key: 'chat_messages').
   - showTyping()/removeTyping(): typing indicator DOM.
   - setFetching(state): disables input and shows spinner while awaiting server response.
-- Keep accessibility in mind: `.messages` has role="log" and aria-live="polite`.
+- Keep accessibility in mind: `.messages` has role="log" and aria-live="polite".
 */
 
 /* === Sections ===
