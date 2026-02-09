@@ -49,6 +49,29 @@ Recent changes (developer notes)
 - ICS export: a new endpoint `GET /export.ics` builds a minimal iCalendar file from in-memory events. Events with times produce timed `DTSTART` values; date-only events export as all-day `DTSTART;VALUE=DATE`.
 - End-time ranges & DTEND: the parser now recognizes simple time ranges (e.g. "3pm-5pm", "from 3pm to 5pm") and stores an `end` value for events when present. The `.ics` exporter emits a `DTEND` for such events when possible.
 
+Recurrence options (UI + server)
+- New quick recurrence choices shown after creating an event:
+  - No reminders
+  - Every day
+  - Every other day
+  - Weekly
+  - Every two weeks
+  - Weekdays (Mon–Fri)
+  - Monthly (same day each month)
+  - Monthly on day X (prompt asks for day number)
+  - Custom (prompt asks for numeric interval, interpreted as days)
+
+Where to edit behavior
+- Server recurrence logic: `set_recurrence(title, frequency, interval)` in `main.py`
+  - Simple stepping algorithm used to compute `next_due`.
+  - For production-grade recurrence handling, replace with an RFC5545 RRULE library (python-dateutil rrule) and persist recurrence to DB/KV.
+- Client UI prompt for recurrence choices: `showRecurrencePrompt(title)` in `public/script.js`.
+  - To add/remove options edit the HTML in this function and the handler logic for `monthly_on_day` / `custom` prompts.
+
+Notes
+- Current implementation stores recurrence metadata in-memory events list. Persist to DB/KV for real usage.
+- `monthly_on_day` uses the interval parameter to carry the day-of-month.
+
 Where to edit the code (quick pointers)
 - `main.py` — core tools and parsing:
   - `add_event(title, date, description)` — validation and storage (now accepts times).

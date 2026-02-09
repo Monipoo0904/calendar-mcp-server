@@ -542,5 +542,169 @@ async def export_ics():
 
 if __name__ == "__main__":
   mcp.run()
- 
+
+@mcp.tool()
+def set_recurrence(title: str, frequency: str = "none", interval: int = 1) -> str:
+    """
+    Set recurrence for the most recent event with `title`.
+
+    frequency values supported:
+      - none: remove recurrence
+      - daily: every day
+      - every_other_day: every 2 days
+      - weekly: every week
+      - biweekly: every 2 weeks
+      - weekdays: Mon-Fri each week day
+      - workdays: alias for weekdays
+      - monthly: once each month on same day (or user-provided day)
+      - monthly_on_day: monthly on a specific day (use `interval` to supply day number)
+      - custom: treated as daily with given interval (simple fallback)
+
+    interval meaning:
+      - for daily/weekly/biweekly/etc: interval number (e.g. 2 = every 2 weeks)
+      - for monthly_on_day: integer day of month (1-31)
+      - for custom: numeric step used as days
+
+    This function sets `recurrence_rrule` (simple RFC-like string) and a basic
+    `next_due` computed by stepping the original event date forward until it's in the future.
+    Note: this is a simple stepping algorithm; for full RFC5545 semantics use an rrule library.
+    """
+    from datetime import datetime, timedelta
+
+    # find most recent event matching title (case-insensitive)
+    candidates = [e for e in events if e.get("title", "").lower() == title.lower()]
+    if not candidates:
+        return f"No event found with title '{title}' to set recurrence."
+    ev = candidates[-1]  # pick most recently added match
+
+    # Normalized frequency keys and simple RRULE-like representation
+    freq_map = {
+        "none": None,
+        "daily": "FREQ=DAILY;INTERVAL=1",
+        "every_other_day": "FREQ=DAILY;INTERVAL=2",
+        "weekly": "FREQ=WEEKLY;INTERVAL=1",
+        "biweekly": "FREQ=WEEKLY;INTERVAL=2",
+        "weekdays": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+        "workdays": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+        "monthly": "FREQ=MONTHLY;INTERVAL=1",
+        # monthly_on_day will be composed below when interval includes day-of-month
+    }
+
+    # Build rrule depending on requested frequency
+    rrule = None
+    key = frequency.lower()
+    if key in freq_map:
+        rrule = freq_map[key]
+    elif key == "monthly_on_day":
+        day = int(interval) if interval and 1 <= int(interval) <= 31 else None
+        if day:
+            rrule = f"FREQ=MONTHLY;BYMONTHDAY={day};INTERVAL=1"
+        else:
+            return "Invalid day-of-month for monthly_on_day. Provide interval as day number (1-31)."
+    elif key == "custom":
+        # fallback: allow custom interval in days
+        if interval and int(interval) > 0:
+            rrule = f"FREQ=DAILY;INTERVAL={int(interval)}"
+        else:
+            return "Invalid custom interval; must be a positive integer."
+    else:
+        return f"Unsupported recurrence frequency '{frequency}'."
+
+    # Persist recurrence metadata
+    ev["recurrence_rrule"] = rrule
+    ev["recur_freq"] = frequency if rrule else None
+    ev["recur_interval"] = int(interval) if rrule and isinstance(interval, (int, str)) and str(interval).isdigit() else None
+
+    # Compute a simple next_due: step forward from the event's date until > now
+    # This is intentionally simple; production should use an rrule library.
+    try:
+        start = ev.get("date") or ev.get("start") or ev.get("datetime") or ev.get("next_due")
+        if not start:
+            ev["next_due"] = None
+            return f"Recurrence set for '{title}', but event has no base date to compute next occurrence."
+
+        # normalize date/datetime parsing (support YYYY-MM-DD and YYYY-MM-DDTHH:MM)
+        if "T" in start:
+            cur = datetime.strptime(start, "%Y-%m-%dT%H:%M")
+            use_time = True
+        else:
+            cur = datetime.strptime(start, "%Y-%m-%d")
+            use_time = False
+
+        now = datetime.now()
+        # choose stepping rules from rrule string
+        if not rrule:
+            ev["next_due"] = cur.strftime("%Y-%m-%dT%H:%M") if use_time else cur.strftime("%Y-%m-%d")
+            return f"Recurrence for '{title}' set to none."
+
+        # interpret simplest cases
+        if "FREQ=DAILY" in rrule:
+            interval_days = 1
+            # extract INTERVAL if present
+            if "INTERVAL=" in rrule:
+                try:
+                    interval_days = int(rrule.split("INTERVAL=")[1].split(";")[0])
+                except Exception:
+                    interval_days = 1
+            step = timedelta(days=interval_days)
+        elif "FREQ=WEEKLY" in rrule:
+            # for BYDAY weekly patterns we step by 1 day until we match allowed weekdays
+            if "BYDAY=" in rrule:
+                allowed = rrule.split("BYDAY=")[1].split(";")[0].split(",")
+                # map weekday names to integers Mon=0..Sun=6
+                wkmap = {"MO":0,"TU":1,"WE":2,"TH":3,"FR":4,"SA":5,"SU":6}
+                allowed_idx = [wkmap[d] for d in allowed if d in wkmap]
+                # advance day-by-day until allowed weekday in future
+                attempts = 0
+                while (cur <= now or cur.weekday() not in allowed_idx) and attempts < 400:
+                    cur = cur + timedelta(days=1)
+                    attempts += 1
+                ev["next_due"] = cur.strftime("%Y-%m-%dT%H:%M") if use_time else cur.strftime("%Y-%m-%d")
+                return f"Recurrence for '{title}' set to '{frequency}'."
+            else:
+                # weekly with interval
+                interval_weeks = 1
+                if "INTERVAL=" in rrule:
+                    try:
+                        interval_weeks = int(rrule.split("INTERVAL=")[1].split(";")[0])
+                    except Exception:
+                        interval_weeks = 1
+                step = timedelta(weeks=interval_weeks)
+        elif "FREQ=MONTHLY" in rrule:
+            # step by months: approximate by adding 28 days until month changes, then adjust
+            def add_months(dt, months):
+                month = dt.month - 1 + months
+                year = dt.year + month // 12
+                month = month % 12 + 1
+                day = min(dt.day, 28)  # avoid invalid days; keep safe default
+                return datetime(year, month, day, dt.hour, dt.minute) if use_time else datetime(year, month, day)
+            interval_months = 1
+            if "INTERVAL=" in rrule:
+                try:
+                    interval_months = int(rrule.split("INTERVAL=")[1].split(";")[0])
+                except Exception:
+                    interval_months = 1
+            attempts = 0
+            while cur <= now and attempts < 120:
+                cur = add_months(cur, interval_months)
+                attempts += 1
+            ev["next_due"] = cur.strftime("%Y-%m-%dT%H:%M") if use_time else cur.strftime("%Y-%m-%d")
+            return f"Recurrence for '{title}' set to '{frequency}'."
+        else:
+            # fallback: daily step by 1
+            step = timedelta(days=1)
+
+        attempts = 0
+        while cur <= now and attempts < 1000:
+            cur = cur + step
+            attempts += 1
+
+        ev["next_due"] = cur.strftime("%Y-%m-%dT%H:%M") if use_time else cur.strftime("%Y-%m-%d")
+    except Exception as exc:
+        # keep recurrence but fallback to storing original date
+        ev["next_due"] = ev.get("date")
+        return f"Recurrence set but failed to compute next due: {exc}"
+
+    return f"Recurrence for '{title}' set to '{frequency}'{(' (interval=' + str(interval) + ')') if key=='custom' else ''}."
+
 

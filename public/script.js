@@ -287,3 +287,78 @@ form.addEventListener('submit', async (e) => {
     setFetching(false);
   }
 });
+
+// helper: render a recurrence prompt below the last bot message
+function showRecurrencePrompt(title){
+  const promptEl = document.createElement('div');
+  promptEl.className = 'message bot';
+  promptEl.innerHTML = `
+    <div class="avatar">⭐</div>
+    <div class="bubble">
+      <div class="text">Would you like reminders for "<strong>${escapeHtml(title)}</strong>"?</div>
+      <div class="meta" style="margin-top:8px; gap:6px;">
+        <button class="copy rec-btn" data-f="none">No reminders</button>
+        <button class="copy rec-btn" data-f="daily">Every day</button>
+        <button class="copy rec-btn" data-f="every_other_day">Every other day</button>
+        <button class="copy rec-btn" data-f="weekly">Weekly</button>
+        <button class="copy rec-btn" data-f="biweekly">Every two weeks</button>
+        <button class="copy rec-btn" data-f="weekdays">Weekdays (Mon–Fri)</button>
+        <button class="copy rec-btn" data-f="monthly">Monthly (same day)</button>
+        <button class="copy rec-btn" data-f="monthly_on_day">Monthly on day...</button>
+        <button class="copy rec-btn" data-f="custom">Custom interval</button>
+      </div>
+    </div>
+  `;
+  messages.appendChild(promptEl);
+  messages.scrollTop = messages.scrollHeight;
+
+  // attach handlers
+  promptEl.querySelectorAll('.rec-btn').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      const freq = e.currentTarget.dataset.f;
+      let interval = 1;
+
+      if (freq === 'monthly_on_day'){
+        const ans = prompt('Enter day of month (1-31) for monthly_on_day:');
+        if (!ans) return;
+        const num = parseInt(ans,10);
+        if (isNaN(num) || num < 1 || num > 31){
+          alert('Invalid day. Please enter 1-31.');
+          return;
+        }
+        interval = num;
+      } else if (freq === 'custom'){
+        const ans = prompt('Enter a numeric interval (e.g., "3" for every 3 days):');
+        if (!ans) return;
+        const num = parseInt(ans,10);
+        if (isNaN(num) || num < 1){
+          alert('Invalid interval; must be positive integer.');
+          return;
+        }
+        interval = num;
+      }
+
+      // call server tool set_recurrence
+      setFetching(true);
+      try {
+        const resp = await fetch('/api/mcp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tool: 'set_recurrence', input: { title, frequency: freq, interval } })
+        });
+        const data = await resp.json().catch(()=>({}));
+        if (resp.ok && data.result){
+          addLocalMessage(data.result, 'bot');
+        } else {
+          addLocalMessage('Error setting recurrence: ' + (data.error || JSON.stringify(data)), 'bot');
+        }
+      } catch (err){
+        addLocalMessage('Network error: ' + err.message, 'bot');
+      } finally {
+        setFetching(false);
+      }
+      // remove the prompt element
+      promptEl.remove();
+    });
+  });
+}
