@@ -33,6 +33,12 @@ const themeToggle = document.getElementById('themeToggle');
 let chat = [] // persisted messages
 let typingEl = null
 
+function getApiUrl() {
+  const origin = window.location.origin;
+  if (!origin || origin === 'null') return '/api/mcp';
+  return `${origin}/api/mcp`;
+}
+
 function save() {
   try {
     localStorage.setItem('chat_messages', JSON.stringify(chat));
@@ -169,7 +175,7 @@ window.addEventListener('load', ()=> input.focus());
   // OAuth sign-in helpers
   async function startOauth(provider) {
     try {
-      const resp = await fetch('/api/mcp', {
+      const resp = await fetch(getApiUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tool: 'oauth_login', input: { provider } })
@@ -273,7 +279,7 @@ form.addEventListener('submit', async (e) => {
   showTyping();
 
   try {
-    const res = await fetch('/api/mcp', {
+    const res = await fetch(getApiUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tool: 'handle_message', input: { message: text } })
@@ -348,7 +354,7 @@ function showRecurrencePrompt(title){
       // call server tool set_recurrence
       setFetching(true);
       try {
-        const resp = await fetch('/api/mcp', {
+        const resp = await fetch(getApiUrl(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tool: 'set_recurrence', input: { title, frequency: freq, interval } })
@@ -389,7 +395,7 @@ async function submitProjectGoal(goalText) {
   addLocalMessage('Working on a plan…', 'bot');
 
   try {
-    const res = await fetch('/api/mcp', {
+    const res = await fetch(getApiUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tool: 'research_and_breakdown', input: { goal: goalText, deadline: deadlineTrim } })
@@ -421,7 +427,7 @@ async function submitProjectGoal(goalText) {
         // call server tool to create tasks from the plan
         setFetching(true);
         try {
-          const resp = await fetch('/api/mcp', {
+          const resp = await fetch(getApiUrl(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tool: 'create_tasks', input: plan })
