@@ -172,7 +172,9 @@ if (chat.length){
 } else {
   addLocalMessage(`Welcome! You can use short commands or natural phrases.
 Examples: "list" (show all events), "summarize", "Add Birthday on 2026-02-01", "Add Meeting March 5 about planning", "Add Lunch tomorrow", "Add Meeting on 2026-02-01 at 14:30", "Add Meeting on March 5 from 3pm to 5pm", "Add Meeting on 2026-03-03 14:00-15:00", "delete:Doctor" or "delete Doctor".
-Format: "Add <Title> on YYYY-MM-DD at HH:MM" (24-hour). Time ranges supported: "from 3pm to 5pm" or shorthand "14:00-15:00". Shorthand with time: add:Title|YYYY-MM-DD HH:MM|Desc`, 'bot');
+Format: "Add <Title> on YYYY-MM-DD at HH:MM" (24-hour). Time ranges supported: "from 3pm to 5pm" or shorthand "14:00-15:00". Shorthand with time: add:Title|YYYY-MM-DD HH:MM|Desc
+
+For project planning: Type "plan" to create a structured project plan with milestones.`, 'bot');
 }
 
 // accessibility: focus input on load
@@ -408,7 +410,21 @@ async function submitProjectGoal(goalText) {
     });
     const { data, text: rawText } = await parseJsonSafe(res);
     if (res.ok && data?.result) {
-      const plan = data.result;
+      let plan = data.result;
+      // If plan is a string (shouldn't happen with the fix, but handle it), try to parse it
+      if (typeof plan === 'string') {
+        try {
+          plan = JSON.parse(plan);
+        } catch (e) {
+          addLocalMessage('Error parsing plan: ' + plan, 'bot');
+          return;
+        }
+      }
+      // Validate plan structure
+      if (!plan || !plan.milestones || !Array.isArray(plan.milestones)) {
+        addLocalMessage('Invalid plan format received: ' + JSON.stringify(plan), 'bot');
+        return;
+      }
       // render plan as bot message with milestones and cadence suggestions
       const lines = [];
       lines.push(`Plan for "${plan.goal}" (deadline: ${plan.deadline || 'not specified'}):`);
@@ -470,7 +486,7 @@ function interceptGoalPrompt(text) {
   if (/what would you like to accomplish\?/i.test(text)) {
     const quick = document.createElement('div');
     quick.className = 'quick-actions';
-    quick.innerHTML = `<button class="copy" id="startProjectBtn">Start Project</button>`;
+    quick.innerHTML = `<p style="margin:4px 0;font-size:0.9em;color:var(--muted);">👇 Click the button below to start planning your project</p><button class="copy" id="startProjectBtn">Start Project</button>`;
     messages.appendChild(quick);
     document.getElementById('startProjectBtn').addEventListener('click', () => {
       const goal = prompt('Briefly describe the goal you want to accomplish (one sentence):');

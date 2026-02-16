@@ -468,6 +468,9 @@ async def call_mcp(request: Request):
                 return res.text
             if isinstance(res, dict) and "result" in res:
                 return res["result"]
+            if isinstance(res, dict):
+                # If it's already a plain dict (like from research_and_breakdown), return as-is
+                return res
             if isinstance(res, (list, tuple)):
                 for it in res:
                     if hasattr(it, "text"):
