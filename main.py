@@ -933,49 +933,49 @@ def research_and_breakdown(goal: str, deadline: str = None) -> dict:
 def create_tasks(plan: dict) -> str:
     """
     Create calendar events from a structured plan object (as returned by `research_and_breakdown`).
-  """
-  if not isinstance(plan, dict):
-    return "Invalid plan payload. Expected a JSON object with milestones."
+    """
+    if not isinstance(plan, dict):
+        return "Invalid plan payload. Expected a JSON object with milestones."
 
-  milestones = plan.get("milestones") or []
-  if not isinstance(milestones, list) or not milestones:
-    return "No milestones found in plan."
+    milestones = plan.get("milestones") or []
+    if not isinstance(milestones, list) or not milestones:
+        return "No milestones found in plan."
 
-  goal = plan.get("goal") or ""
-  created = 0
-  skipped = 0
+    goal = plan.get("goal") or ""
+    created = 0
+    skipped = 0
 
-  for m in milestones:
-    if not isinstance(m, dict):
-      skipped += 1
-      continue
-    title = (m.get("title") or "Milestone").strip()
-    due = (m.get("due") or m.get("date") or "").strip()
-    if not due:
-      skipped += 1
-      continue
-    desc = m.get("description") or (f"Milestone for: {goal}" if goal else "")
+    for m in milestones:
+        if not isinstance(m, dict):
+            skipped += 1
+            continue
+        title = (m.get("title") or "Milestone").strip()
+        due = (m.get("due") or m.get("date") or "").strip()
+        if not due:
+            skipped += 1
+            continue
+        desc = m.get("description") or (f"Milestone for: {goal}" if goal else "")
 
-    # Reuse add_event validation; it accepts YYYY-MM-DD and YYYY-MM-DDTHH:MM
-    before_len = len(events)
-    result = add_event(title=title, date=due, description=desc)
-    if result.startswith("Event added:"):
-      if len(events) > before_len:
-        events[-1]["milestone"] = True
-      created += 1
-    else:
-      skipped += 1
+        # Reuse add_event validation; it accepts YYYY-MM-DD and YYYY-MM-DDTHH:MM
+        before_len = len(events)
+        result = add_event(title=title, date=due, description=desc)
+        if result.startswith("Event added:"):
+            if len(events) > before_len:
+                events[-1]["milestone"] = True
+            created += 1
+        else:
+            skipped += 1
 
-  # Create sub-task events for actionable steps if provided
-  for m in milestones:
-    steps = m.get("steps") if isinstance(m, dict) else None
-    due = (m.get("due") or m.get("date") or "").strip() if isinstance(m, dict) else ""
-    if not due or not isinstance(steps, list):
-      continue
-    for step in steps:
-      if not isinstance(step, str) or not step.strip():
-        continue
-      step_title = f"{(m.get('title') or 'Milestone').strip()} — {step.strip()}"
-      add_event(title=step_title, date=due, description=f"Step for: {goal}" if goal else "")
+    # Create sub-task events for actionable steps if provided
+    for m in milestones:
+        steps = m.get("steps") if isinstance(m, dict) else None
+        due = (m.get("due") or m.get("date") or "").strip() if isinstance(m, dict) else ""
+        if not due or not isinstance(steps, list):
+            continue
+        for step in steps:
+            if not isinstance(step, str) or not step.strip():
+                continue
+            step_title = f"{(m.get('title') or 'Milestone').strip()} — {step.strip()}"
+            add_event(title=step_title, date=due, description=f"Step for: {goal}" if goal else "")
 
-  return f"Created {created} milestone event(s). Skipped {skipped}."
+    return f"Created {created} milestone event(s). Skipped {skipped}."
