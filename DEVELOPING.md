@@ -64,7 +64,11 @@ Developer notes — recent features and where to edit
   - `handle_message(message)` implements the conversational parsing logic. Date detection and normalization happen in `find_date_in_msg()` and `parse_date_token()`; time normalization is in `parse_time_token()`.
   - `add_event(title, date, description)` now accepts date+time formats and stores events as either `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`.
 - .ics export: the `GET /export.ics` route is defined in `main.py` and serializes the in-memory `events` list to a downloadable iCalendar file. Timed events are emitted with a `DTSTART` timestamp; date-only events are exported as `DTSTART;VALUE=DATE`.
-- Project planning + LLM: `research_and_breakdown(goal, deadline)` can call an LLM to generate milestones with actionable steps. It uses OpenRouter when `LLM_API_KEY` is set.
+- Project planning + LLM: 
+  - **Server-side**: `research_and_breakdown(goal, deadline)` tool in `main.py` calls OpenRouter API when `LLM_API_KEY` environment variable is set. Falls back to heuristic plan generation if LLM is unavailable.
+  - **Client-side flow**: `public/script.js` implements the planning UI flow using browser prompts. When user types "plan" or clicks "Start Project", it prompts for goal, deadline (YYYY-MM-DD), then calls the `research_and_breakdown` tool via `/api/mcp`. The plan is displayed with a "Create tasks from plan" button that calls the `create_tasks` tool.
+  - **Important**: Planning flow is entirely client-side to avoid state issues in serverless deployments. The server only provides stateless tools (`research_and_breakdown`, `create_tasks`).
+  - **Environment variable**: Set `LLM_API_KEY` in Vercel project settings for LLM-powered planning. Otherwise, heuristic plans are generated.
 - UI examples and guidance: update `public/index.html` (composer tooltip, `composerHelp`) and `public/script.js` (welcome bot message) to change the examples or instructions shown to users.
 - Styling: `public/style.css` contains variables at the top (`:root`) and the `auth-button` class used by the Connect and Export buttons.
 
