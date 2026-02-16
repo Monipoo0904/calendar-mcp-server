@@ -176,6 +176,10 @@ body{margin:0;font-family:Inter,Helvetica,Arial,sans-serif;background:var(--bg);
 .copy{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted);padding:4px 8px;border-radius:6px;font-size:0.8rem}
 .linklike{background:transparent;border:0;color:var(--accent);cursor:pointer}
 
+/* Keep chat layout stable so messages remain visible on small or tall screens */
+.chat{display:flex;flex-direction:column;min-height:70vh}
+.messages{flex:1;min-height:260px}
+
 /* Spinner */
 .spinner{width:28px;height:28px;border-radius:8px;border:3px solid rgba(255,255,255,0.04);border-top-color:var(--send);animation:spin 1s linear infinite;margin-left:6px}
 @keyframes spin{to{transform:rotate(360deg)}}
