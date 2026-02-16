@@ -550,6 +550,9 @@ async def export_ics():
     uid = str(uuid.uuid4())
     # date in format YYYYMMDD for all-day DTSTART
     desc = e.get('description', '') or ''
+    title = e.get('title', '')
+    if e.get('milestone'):
+      title = f"[Milestone] {title}" if title else "[Milestone]"
     if 'T' in e.get('date', ''):
       # timed event: YYYY-MM-DDTHH:MM
       try:
@@ -570,7 +573,7 @@ async def export_ics():
           except Exception:
             pass
         vevent.extend([
-          f"SUMMARY:{e.get('title','')}",
+          f"SUMMARY:{title}",
           f"DESCRIPTION:{desc}",
           "END:VEVENT",
         ])
@@ -593,7 +596,7 @@ async def export_ics():
           except Exception:
             pass
         vevent.extend([
-          f"SUMMARY:{e.get('title','')}",
+          f"SUMMARY:{title}",
           f"DESCRIPTION:{desc}",
           "END:VEVENT",
         ])
@@ -605,7 +608,7 @@ async def export_ics():
         f"UID:{uid}",
         f"DTSTAMP:{now}",
         f"DTSTART;VALUE=DATE:{dtstart}",
-        f"SUMMARY:{e.get('title','')}",
+        f"SUMMARY:{title}",
         f"DESCRIPTION:{desc}",
         "END:VEVENT",
       ])
@@ -912,4 +915,37 @@ def research_and_breakdown(goal: str, deadline: str = None) -> dict:
 def create_tasks(plan: dict) -> str:
     """
     Create calendar events from a structured plan object (as returned by `research_and_breakdown`).
-"""
+  """
+  if not isinstance(plan, dict):
+    return "Invalid plan payload. Expected a JSON object with milestones."
+
+  milestones = plan.get("milestones") or []
+  if not isinstance(milestones, list) or not milestones:
+    return "No milestones found in plan."
+
+  goal = plan.get("goal") or ""
+  created = 0
+  skipped = 0
+
+  for m in milestones:
+    if not isinstance(m, dict):
+      skipped += 1
+      continue
+    title = (m.get("title") or "Milestone").strip()
+    due = (m.get("due") or m.get("date") or "").strip()
+    if not due:
+      skipped += 1
+      continue
+    desc = m.get("description") or (f"Milestone for: {goal}" if goal else "")
+
+    # Reuse add_event validation; it accepts YYYY-MM-DD and YYYY-MM-DDTHH:MM
+    before_len = len(events)
+    result = add_event(title=title, date=due, description=desc)
+    if result.startswith("Event added:"):
+      if len(events) > before_len:
+        events[-1]["milestone"] = True
+      created += 1
+    else:
+      skipped += 1
+
+  return f"Created {created} milestone event(s). Skipped {skipped}."
