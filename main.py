@@ -29,9 +29,6 @@ app = FastAPI()
 # Each event is a dict: {"title": str, "date": str, "description": str} 
 events: List[Dict] = []
 
-# In-memory goal flow state (very simple, resets on restart)
-pending_goal = {"goal": None, "deadline": None, "cadence": None}
-
 # Add an event 
 @mcp.tool() 
 
@@ -353,25 +350,6 @@ def handle_message(message: str) -> str:
       lines.append("Chosen cadence: " + cadence_choice.replace("_", " "))
     return "\n".join(lines)
 
-  # --- Project planning flow: deadline step ---
-  if pending_goal["goal"] and pending_goal["deadline"] is None:
-    pending_goal["deadline"] = normalize_deadline(msg)
-    if not pending_goal["deadline"]:
-      return "Please enter a valid deadline in YYYY-MM-DD (or a date like 'March 5')."
-
-    return "How often would you like to work on this? (daily / every other day / weekly / biweekly / weekdays / monthly / custom)"
-
-  # --- Project planning flow: cadence step ---
-  if pending_goal["goal"] and pending_goal["deadline"] is not None and pending_goal["cadence"] is None:
-    cad = normalize_cadence(msg)
-    pending_goal["cadence"] = cad or "unspecified"
-    plan = research_and_breakdown(pending_goal["goal"], pending_goal["deadline"])
-    # reset state
-    pending_goal["goal"] = None
-    pending_goal["deadline"] = None
-    pending_goal["cadence"] = None
-    return format_plan(plan, cad)
-
   # Summaries
   if any(k in low for k in ("summarize", "summary", "what's coming", "upcoming", "brief")):
     return summarize_events()
@@ -449,19 +427,18 @@ def handle_message(message: str) -> str:
     title = m.group('title').strip()
     return delete_event(title)
 
-  # --- If it's not a calendar command, treat it as a goal and ask for deadline ---
-  if msg:
-    pending_goal["goal"] = msg
-    pending_goal["deadline"] = None
-    pending_goal["cadence"] = None
-    return "Great — when would you like this done by? (YYYY-MM-DD or a date like 'March 5')"
+  # For project planning, guide users to use the client-side flow or call research_and_breakdown tool directly
+  if any(k in low for k in ("plan", "project", "goal", "accomplish", "breakdown")):
+    return "What would you like to accomplish? (Describe your goal and I'll help you plan it out.)"
 
   # Fallback help text (should rarely hit)
   return (
     "Sorry, I didn't understand. Try commands like:\n"
     "- \"Add Birthday on 2026-02-01\"\n"
-    "- \"List events on 2026-03-03\"\n"
+    "- \"List events\" or \"List events on 2026-03-03\"\n"
     "- \"Summarize upcoming\"\n"
+    "- \"Delete Birthday\"\n"
+    "- \"Plan\" to start project planning\n"
   )
 
 
