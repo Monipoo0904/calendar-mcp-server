@@ -64,6 +64,7 @@ Developer notes — recent features and where to edit
   - `handle_message(message)` implements the conversational parsing logic. Date detection and normalization happen in `find_date_in_msg()` and `parse_date_token()`; time normalization is in `parse_time_token()`.
   - `add_event(title, date, description)` now accepts date+time formats and stores events as either `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`.
 - .ics export: the `GET /export.ics` route is defined in `main.py` and serializes the in-memory `events` list to a downloadable iCalendar file. Timed events are emitted with a `DTSTART` timestamp; date-only events are exported as `DTSTART;VALUE=DATE`.
+- Project planning + LLM: `research_and_breakdown(goal, deadline)` can call an LLM to generate milestones with actionable steps. It uses OpenRouter when `LLM_API_KEY` is set.
 - UI examples and guidance: update `public/index.html` (composer tooltip, `composerHelp`) and `public/script.js` (welcome bot message) to change the examples or instructions shown to users.
 - Styling: `public/style.css` contains variables at the top (`:root`) and the `auth-button` class used by the Connect and Export buttons.
 
@@ -75,6 +76,9 @@ Suggested edit flow
 
 Notes about deployment
 - `api/mcp.py` is a serverless handler continuity helper — use it if deploying to Vercel. If you introduce OAuth flows, ensure the provider redirect URIs match your deployment host and secure client credentials (do not commit them to the repo).
+- LLM settings:
+  - `LLM_API_KEY`: OpenRouter API key.
+  - `OPENROUTER_MODEL`: optional override for the model name (default: `google/gemini-3-flash-preview`).
 
 Tips:
 - Avatars: change the emoji strings in `renderMessage` and `showTyping`.

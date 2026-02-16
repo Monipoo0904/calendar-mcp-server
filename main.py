@@ -342,6 +342,11 @@ def handle_message(message: str) -> str:
     lines.append(f'Plan for "{plan.get("goal","(goal)")}" (deadline: {plan.get("deadline") or "not specified"}):')
     for i, m in enumerate(plan.get("milestones", []), start=1):
       lines.append(f'{i}. {m.get("title","Milestone")} — due {m.get("due","")}')
+      steps = m.get("steps") or []
+      if isinstance(steps, list) and steps:
+        for step in steps:
+          if isinstance(step, str) and step.strip():
+            lines.append(f"   - {step.strip()}")
     if plan.get("cadence_suggestions"):
       lines.append("Suggested cadences: " + ", ".join(plan["cadence_suggestions"]))
     if cadence_choice:
@@ -350,10 +355,9 @@ def handle_message(message: str) -> str:
 
   # --- Project planning flow: deadline step ---
   if pending_goal["goal"] and pending_goal["deadline"] is None:
-    if low in ("skip", "none", "no"):
-      pending_goal["deadline"] = None
-    else:
-      pending_goal["deadline"] = normalize_deadline(msg)
+    pending_goal["deadline"] = normalize_deadline(msg)
+    if not pending_goal["deadline"]:
+      return "Please enter a valid deadline in YYYY-MM-DD (or a date like 'March 5')."
 
     return "How often would you like to work on this? (daily / every other day / weekly / biweekly / weekdays / monthly / custom)"
 
@@ -450,7 +454,7 @@ def handle_message(message: str) -> str:
     pending_goal["goal"] = msg
     pending_goal["deadline"] = None
     pending_goal["cadence"] = None
-    return "Great — when would you like this done by? (YYYY-MM-DD, a date like 'March 5', or 'skip')"
+    return "Great — when would you like this done by? (YYYY-MM-DD or a date like 'March 5')"
 
   # Fallback help text (should rarely hit)
   return (
@@ -817,50 +821,59 @@ def research_and_breakdown(goal: str, deadline: str = None) -> dict:
             dt_deadline = None
 
     # Integrate with external LLM if configured (optional)
-    llm_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
+    llm_key = os.getenv("LLM_API_KEY")
     if llm_key:
-        try:
-            # Call OpenAI Chat Completions API (simple request; adjust model as desired)
-            prompt = (
-                "You are a planning assistant. Given a user goal and optional deadline, "
-                "return a JSON object with keys: goal, deadline (YYYY-MM-DD or null), "
-                "estimated_days (int), milestones (array of {title,due}), "
-                "cadence_suggestions (array of strings). Only emit pure JSON."
-                f"\n\nGoal: {goal}\nDeadline: {deadline or 'none'}\n\n"
-                "Return the JSON without extra commentary."
-            )
-            headers = {"Authorization": f"Bearer {llm_key}", "Content-Type": "application/json"}
-            payload = {
-                "model": "gpt-4",
-                "messages": [{"role":"system","content":"You output only JSON."},
-                             {"role":"user","content":prompt}],
-                "temperature": 0.2,
-                "max_tokens": 600,
-            }
-            resp = httpx.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers, timeout=15.0)
-            if resp.status_code == 200:
-                body = resp.json()
-                text = body.get("choices", [{}])[0].get("message", {}).get("content", "")
-                # try to parse JSON from the model output
-                try:
-                    parsed = json.loads(text)
-                    # ensure minimal keys exist
-                    if isinstance(parsed, dict) and "milestones" in parsed:
-                        return parsed
-                except Exception:
-                    # best-effort: try to extract JSON substring
-                    start = text.find("{")
-                    end = text.rfind("}")
-                    if start != -1 and end != -1 and end > start:
-                        try:
-                            parsed = json.loads(text[start:end+1])
-                            if isinstance(parsed, dict) and "milestones" in parsed:
-                                return parsed
-                        except Exception:
-                            pass
-            # fall through to heuristic if LLM response unusable
-        except Exception:
-            pass
+      try:
+        model = os.getenv("OPENROUTER_MODEL", "google/gemini-3-flash-preview")
+        prompt = (
+          "You are a planning assistant. Given a user goal and optional deadline, "
+          "return a JSON object with keys: goal, deadline (YYYY-MM-DD or null), "
+          "estimated_days (int), milestones (array of {title,due,steps}), "
+          "cadence_suggestions (array of strings). "
+          "Each milestone.steps should be a short list of actionable tasks. "
+          "Only emit pure JSON."
+          f"\n\nGoal: {goal}\nDeadline: {deadline or 'none'}\n\n"
+          "Return the JSON without extra commentary."
+        )
+        headers = {
+          "Authorization": f"Bearer {llm_key}",
+          "Content-Type": "application/json",
+        }
+        payload = {
+          "model": model,
+          "messages": [
+            {"role": "system", "content": "You output only JSON."},
+            {"role": "user", "content": prompt},
+          ],
+          "temperature": 0.2,
+          "max_tokens": 800,
+        }
+        resp = httpx.post(
+          "https://openrouter.ai/api/v1/chat/completions",
+          json=payload,
+          headers=headers,
+          timeout=20.0,
+        )
+        if resp.status_code == 200:
+          body = resp.json()
+          text = body.get("choices", [{}])[0].get("message", {}).get("content", "")
+          try:
+            parsed = json.loads(text)
+            if isinstance(parsed, dict) and "milestones" in parsed:
+              return parsed
+          except Exception:
+            start = text.find("{")
+            end = text.rfind("}")
+            if start != -1 and end != -1 and end > start:
+              try:
+                parsed = json.loads(text[start:end+1])
+                if isinstance(parsed, dict) and "milestones" in parsed:
+                  return parsed
+              except Exception:
+                pass
+        # fall through to heuristic if LLM response unusable
+      except Exception:
+        pass
 
     # Heuristic breakdown generator
     # Choose between 3 and 6 milestones depending on time available
@@ -887,8 +900,13 @@ def research_and_breakdown(goal: str, deadline: str = None) -> dict:
         cur = cur + timedelta(days=days_per_milestone)
         m_title = f"Milestone {i}: {goal.split()[0:3] and ' '.join(goal.split()[0:3]) or 'Step'}"
         milestones.append({
-            "title": m_title,
-            "due": cur.strftime("%Y-%m-%d")
+          "title": m_title,
+          "due": cur.strftime("%Y-%m-%d"),
+          "steps": [
+            "Clarify requirements",
+            "Draft a quick plan",
+            "Build the first version",
+          ],
         })
 
     # cadence suggestions based on total days
@@ -947,5 +965,17 @@ def create_tasks(plan: dict) -> str:
       created += 1
     else:
       skipped += 1
+
+  # Create sub-task events for actionable steps if provided
+  for m in milestones:
+    steps = m.get("steps") if isinstance(m, dict) else None
+    due = (m.get("due") or m.get("date") or "").strip() if isinstance(m, dict) else ""
+    if not due or not isinstance(steps, list):
+      continue
+    for step in steps:
+      if not isinstance(step, str) or not step.strip():
+        continue
+      step_title = f"{(m.get('title') or 'Milestone').strip()} — {step.strip()}"
+      add_event(title=step_title, date=due, description=f"Step for: {goal}" if goal else "")
 
   return f"Created {created} milestone event(s). Skipped {skipped}."

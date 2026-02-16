@@ -1,4 +1,7 @@
-/*
+git status
+git add public/script.js
+git commit -m "fix(ui): keep composer scrollable and update planning flow notes"
+git push origin main/*
 Developer notes (public/script.js)
 - Main responsibilities: rendering messages, handling composer actions, managing localStorage, theme toggle, and calling `/api/mcp`.
 - Key functions:
@@ -371,8 +374,17 @@ function showRecurrencePrompt(title){
 
 async function submitProjectGoal(goalText) {
   // prompt user for deadline
-  const deadline = prompt('When would you like this done by? (YYYY-MM-DD or leave blank)');
+  const deadline = prompt('When would you like this done by? (YYYY-MM-DD)');
   if (deadline === null) return; // user canceled
+  const deadlineTrim = deadline.trim();
+  if (!deadlineTrim) {
+    addLocalMessage('Please enter a deadline in YYYY-MM-DD to continue.', 'bot');
+    return;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(deadlineTrim)) {
+    addLocalMessage('Invalid deadline format. Use YYYY-MM-DD (e.g., 2026-03-05).', 'bot');
+    return;
+  }
   addLocalMessage(goalText, 'user');
   addLocalMessage('Working on a plan…', 'bot');
 
@@ -380,7 +392,7 @@ async function submitProjectGoal(goalText) {
     const res = await fetch('/api/mcp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tool: 'research_and_breakdown', input: { goal: goalText, deadline } })
+      body: JSON.stringify({ tool: 'research_and_breakdown', input: { goal: goalText, deadline: deadlineTrim } })
     });
     const data = await res.json();
     if (res.ok && data.result) {
@@ -388,7 +400,16 @@ async function submitProjectGoal(goalText) {
       // render plan as bot message with milestones and cadence suggestions
       const lines = [];
       lines.push(`Plan for "${plan.goal}" (deadline: ${plan.deadline || 'not specified'}):`);
-      plan.milestones.forEach((m, i) => lines.push(`${i+1}. ${m.title} — due ${m.due}`));
+      plan.milestones.forEach((m, i) => {
+        lines.push(`${i+1}. ${m.title} — due ${m.due}`);
+        if (Array.isArray(m.steps) && m.steps.length) {
+          m.steps.forEach((step) => {
+            if (step && String(step).trim()) {
+              lines.push(`   - ${String(step).trim()}`);
+            }
+          });
+        }
+      });
       lines.push('Suggested cadences: ' + (plan.cadence_suggestions || []).join(', '));
       addLocalMessage(lines.join('\n'), 'bot');
 
