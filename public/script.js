@@ -30,6 +30,15 @@ const themeToggle = document.getElementById('themeToggle');
 let chat = [] // persisted messages
 let typingEl = null
 
+async function parseJsonSafe(res) {
+  const text = await res.text();
+  try {
+    return { data: JSON.parse(text), text };
+  } catch (e) {
+    return { data: null, text };
+  }
+}
+
 function getApiUrl() {
   const origin = window.location.origin;
   if (!origin || origin === 'null') return '/api/mcp';
@@ -177,12 +186,12 @@ window.addEventListener('load', ()=> input.focus());
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tool: 'oauth_login', input: { provider } })
       });
-      const body = await resp.json().catch(() => ({}));
+      const { data, text } = await parseJsonSafe(resp);
       if (!resp.ok) {
-        showBanner((body && body.error) ? JSON.stringify(body.error) : `Error ${resp.status}` , 'error');
+        showBanner((data && data.error) ? JSON.stringify(data.error) : (text || `Error ${resp.status}`), 'error');
         return;
       }
-      const result = body.result;
+      const result = data?.result;
       const url = (typeof result === 'string') ? result : (result?.auth_url || result?.url || result?.redirect_url);
       if (url) {
         // perform a top-level redirect to avoid popup blocking
@@ -282,13 +291,13 @@ form.addEventListener('submit', async (e) => {
       body: JSON.stringify({ tool: 'handle_message', input: { message: text } })
     });
 
-    const data = await res.json();
+    const { data, text: rawText } = await parseJsonSafe(res);
     removeTyping();
 
     if (res.ok && data && data.result) {
       addLocalMessage(data.result, 'bot');
     } else {
-      addLocalMessage('Error: ' + (data?.error || JSON.stringify(data)), 'bot');
+      addLocalMessage(`Error (${res.status}): ` + (data?.error || rawText || JSON.stringify(data)), 'bot');
     }
   } catch (err) {
     removeTyping();
@@ -356,11 +365,11 @@ function showRecurrencePrompt(title){
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tool: 'set_recurrence', input: { title, frequency: freq, interval } })
         });
-        const data = await resp.json().catch(()=>({}));
-        if (resp.ok && data.result){
+        const { data, text: rawText } = await parseJsonSafe(resp);
+        if (resp.ok && data?.result){
           addLocalMessage(data.result, 'bot');
         } else {
-          addLocalMessage('Error setting recurrence: ' + (data.error || JSON.stringify(data)), 'bot');
+          addLocalMessage('Error setting recurrence: ' + (data?.error || rawText || JSON.stringify(data)), 'bot');
         }
       } catch (err){
         addLocalMessage('Network error: ' + err.message, 'bot');
@@ -397,8 +406,8 @@ async function submitProjectGoal(goalText) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tool: 'research_and_breakdown', input: { goal: goalText, deadline: deadlineTrim } })
     });
-    const data = await res.json();
-    if (res.ok && data.result) {
+    const { data, text: rawText } = await parseJsonSafe(res);
+    if (res.ok && data?.result) {
       const plan = data.result;
       // render plan as bot message with milestones and cadence suggestions
       const lines = [];
@@ -429,11 +438,11 @@ async function submitProjectGoal(goalText) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tool: 'create_tasks', input: plan })
           });
-          const body = await resp.json().catch(()=>({}));
-          if (resp.ok && body.result) {
-            addLocalMessage(body.result, 'bot');
+          const { data: taskData, text: taskText } = await parseJsonSafe(resp);
+          if (resp.ok && taskData?.result) {
+            addLocalMessage(taskData.result, 'bot');
           } else {
-            addLocalMessage('Failed to create tasks: ' + (body.error || JSON.stringify(body)), 'bot');
+            addLocalMessage('Failed to create tasks: ' + (taskData?.error || taskText || JSON.stringify(taskData)), 'bot');
           }
         } catch (err) {
           addLocalMessage('Network error creating tasks: ' + err.message, 'bot');
@@ -448,7 +457,7 @@ async function submitProjectGoal(goalText) {
       messages.appendChild(wrapper);
       messages.scrollTop = messages.scrollHeight;
     } else {
-      addLocalMessage('Failed to generate plan: ' + (data.error || JSON.stringify(data)), 'bot');
+      addLocalMessage('Failed to generate plan: ' + (data?.error || rawText || JSON.stringify(data)), 'bot');
     }
   } catch (err) {
     addLocalMessage('Network error when generating plan: ' + err.message, 'bot');
