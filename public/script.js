@@ -1,7 +1,4 @@
-git status
-git add public/script.js
-git commit -m "fix(ui): keep composer scrollable and update planning flow notes"
-git push origin main/*
+/*
 Developer notes (public/script.js)
 - Main responsibilities: rendering messages, handling composer actions, managing localStorage, theme toggle, and calling `/api/mcp`.
 - Key functions:
