@@ -261,7 +261,18 @@ function clearConversation(){
   chat = [];
   save();
   messages.innerHTML = '';
-  addLocalMessage('Conversation cleared.');
+  // Re-show welcome message with planning trigger
+  const welcomeMsg = `Welcome! I can help you manage events and plan projects.
+
+What would you like to accomplish?
+
+You can also use commands like:
+• "list" — show all events
+• "Add Birthday on 2026-02-01" — add an event
+• "Add Meeting on 2026-02-01 at 14:30" — add a timed event
+• "summarize" — get a summary of upcoming events
+• "delete:EventTitle" — remove an event`;
+  addLocalMessage(welcomeMsg, 'bot');
 }
 clearBtn?.addEventListener('click', clearConversation);
 clearBtnTop?.addEventListener('click', clearConversation);
