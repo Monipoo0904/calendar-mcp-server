@@ -181,24 +181,6 @@ You can also use commands like:
 • "summarize" — get a summary of upcoming events
 • "delete:EventTitle" — remove an event`;
   addLocalMessage(welcomeMsg, 'bot');
-  
-  // Show the Start Project button immediately
-  const quick = document.createElement('div');
-  quick.className = 'quick-actions';
-  quick.innerHTML = `<p style="margin:4px 0;font-size:0.9em;color:var(--muted);">👇 Click the button below to start planning your project</p><button class="copy" id="startProjectBtn">Start Project</button>`;
-  messages.appendChild(quick);
-  const startBtn = document.getElementById('startProjectBtn');
-  if (startBtn) {
-    startBtn.addEventListener('click', () => {
-      const goal = prompt('Briefly describe the goal you want to accomplish (one sentence):');
-      if (!goal) return;
-      // We'll need to load submitProjectGoal when it's defined
-      if (typeof submitProjectGoal === 'function') {
-        submitProjectGoal(goal);
-      }
-      quick.remove();
-    });
-  }
   messages.scrollTop = messages.scrollHeight;
 }
 
