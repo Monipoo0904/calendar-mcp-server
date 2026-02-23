@@ -176,6 +176,25 @@ body{margin:0;font-family:Inter,Helvetica,Arial,sans-serif;background:var(--bg);
 .copy{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted);padding:4px 8px;border-radius:6px;font-size:0.8rem}
 .linklike{background:transparent;border:0;color:var(--accent);cursor:pointer}
 
+/* Planning action buttons: keep primary action visually dominant */
+.plan-primary-btn,
+.plan-secondary-btn{opacity:1 !important}
+
+.plan-primary-btn{
+  background:var(--send);
+  border:1px solid var(--send);
+  color:#fff;
+  font-weight:600;
+}
+
+.plan-secondary-btn{
+  background:transparent;
+  border:1px solid rgba(0,0,0,0.12);
+  color:var(--muted);
+}
+
+[data-theme="dark"] .plan-secondary-btn{border-color:rgba(255,255,255,0.12)}
+
 /* Keep chat layout stable so messages remain visible on small or tall screens */
 .chat{display:flex;flex-direction:column;min-height:70vh}
 .messages{flex:1;min-height:260px}

@@ -497,8 +497,8 @@ async function submitProjectGoal(goalText) {
         <div class="bubble">
           <div class="text">Ready to add these milestones to your calendar?</div>
           <div class="meta" style="margin-top:8px;">
-            <button class="copy create-tasks-btn">Create tasks from plan</button>
-            <button class="copy export-ics-btn">Export .ics now</button>
+            <button class="copy create-tasks-btn plan-primary-btn">Create tasks from plan</button>
+            <button class="copy export-ics-btn plan-secondary-btn">Export .ics now</button>
           </div>
         </div>
       `;
