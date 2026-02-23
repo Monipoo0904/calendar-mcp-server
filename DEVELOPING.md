@@ -74,7 +74,12 @@ Developer notes — recent features and where to edit
   - **Cadence + reminders flow**:
     - After clicking "Create tasks from plan", client prompts for cadence and whether reminders should be created.
     - Task creation uses server tool `create_tasks`; reminder cadence uses `set_recurrence` per milestone.
+    - **Payload shape requirement**: `create_tasks` expects a named argument, so client requests must send `{"tool":"create_tasks","input":{"plan": <plan_object>}}` (not `input: plan_object` directly).
     - If you rename cadence values, keep them aligned with accepted `set_recurrence` frequency keys in `main.py`.
+  - **Sanity logs for debugging**:
+    - Browser-side planning logs use prefix `[plan-client]` (see DevTools Console).
+    - Server-side handler logs use prefix `[mcp-handler]` (Vercel logs / terminal output).
+    - When task creation fails, check both logs to quickly confirm whether the payload shape or tool validation failed.
   - **Prompt trigger dependency**:
     - The quick "Start Project" button is text-triggered by the bot phrase `What would you like to accomplish?` in `interceptGoalPrompt()`.
     - If you change that phrase, also update the regex trigger to avoid breaking the initial quick-start button.

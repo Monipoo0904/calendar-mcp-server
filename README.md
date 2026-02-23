@@ -61,6 +61,13 @@ Recurrence options (UI + server)
   - Monthly on day X (prompt asks for day number)
   - Custom (prompt asks for numeric interval, interpreted as days)
 
+Planning debug notes
+- `create_tasks` requires named input argument `plan`. Client requests must use:
+  - `{"tool":"create_tasks","input":{"plan": <plan_object>}}`
+- Browser planning diagnostics are logged with prefix `[plan-client]`.
+- Server handler diagnostics are logged with prefix `[mcp-handler]`.
+- If task creation fails, compare both logs first to confirm payload shape and tool validation path.
+
 Where to edit behavior
 - Server recurrence logic: `set_recurrence(title, frequency, interval)` in `main.py`
   - Simple stepping algorithm used to compute `next_due`.
