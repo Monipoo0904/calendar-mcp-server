@@ -85,8 +85,8 @@ async def handler(request):
 
         _log("INFO", f"Tool call requested: tool={tool_name!r}, input_keys={list(tool_input.keys())}")
 
-        if tool_name == "create_tasks" and "milestones" not in tool_input:
-            _log("WARN", "create_tasks called without top-level 'milestones' key; this may fail")
+        if tool_name == "create_tasks" and "plan" not in tool_input:
+            _log("WARN", "create_tasks called without required top-level 'plan' key; this may fail")
 
         if not tool_name:
             _log("WARN", "Missing tool name in request payload")

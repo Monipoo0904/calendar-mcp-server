@@ -911,51 +911,82 @@ def research_and_breakdown(goal: str, deadline: str = None) -> dict:
 # New server-side tool: create_tasks from a plan
 @mcp.tool()
 def create_tasks(plan: dict) -> str:
-    """
-    Create calendar events from a structured plan object (as returned by `research_and_breakdown`).
-    """
-    if not isinstance(plan, dict):
-        return "Invalid plan payload. Expected a JSON object with milestones."
+  """
+  Create calendar events from a structured plan object (as returned by `research_and_breakdown`).
+  """
+  if not isinstance(plan, dict):
+    return "Invalid plan payload. Expected a JSON object with milestones."
 
-    milestones = plan.get("milestones") or []
-    if not isinstance(milestones, list) or not milestones:
-        return "No milestones found in plan."
+  milestones = plan.get("milestones") or []
+  if not isinstance(milestones, list) or not milestones:
+    return "No milestones found in plan."
 
-    goal = plan.get("goal") or ""
-    created = 0
-    skipped = 0
+  def _normalize_due(raw_due: str) -> str:
+    if not isinstance(raw_due, str):
+      return ""
+    due = raw_due.strip()
+    if not due:
+      return ""
 
-    for m in milestones:
-        if not isinstance(m, dict):
-            skipped += 1
-            continue
-        title = (m.get("title") or "Milestone").strip()
-        due = (m.get("due") or m.get("date") or "").strip()
-        if not due:
-            skipped += 1
-            continue
-        desc = m.get("description") or (f"Milestone for: {goal}" if goal else "")
+    known_formats = (
+      "%Y-%m-%d",
+      "%Y-%m-%d %H:%M",
+      "%Y-%m-%dT%H:%M",
+      "%Y-%m-%d %H:%M:%S",
+      "%Y-%m-%dT%H:%M:%S",
+      "%Y-%m-%dT%H:%M:%SZ",
+    )
+    for fmt in known_formats:
+      try:
+        dt = datetime.strptime(due, fmt)
+        if "%H" in fmt:
+          return dt.strftime("%Y-%m-%dT%H:%M")
+        return dt.strftime("%Y-%m-%d")
+      except Exception:
+        pass
 
-        # Reuse add_event validation; it accepts YYYY-MM-DD and YYYY-MM-DDTHH:MM
-        before_len = len(events)
-        result = add_event(title=title, date=due, description=desc)
-        if result.startswith("Event added:"):
-            if len(events) > before_len:
-                events[-1]["milestone"] = True
-            created += 1
-        else:
-            skipped += 1
+    try:
+      iso = due.replace("Z", "+00:00")
+      dt = datetime.fromisoformat(iso)
+      if any(sep in due for sep in ("T", " ")):
+        return dt.strftime("%Y-%m-%dT%H:%M")
+      return dt.strftime("%Y-%m-%d")
+    except Exception:
+      return ""
 
-    # Create sub-task events for actionable steps if provided
-    for m in milestones:
-        steps = m.get("steps") if isinstance(m, dict) else None
-        due = (m.get("due") or m.get("date") or "").strip() if isinstance(m, dict) else ""
-        if not due or not isinstance(steps, list):
-            continue
-        for step in steps:
-            if not isinstance(step, str) or not step.strip():
-                continue
-            step_title = f"{(m.get('title') or 'Milestone').strip()} — {step.strip()}"
-            add_event(title=step_title, date=due, description=f"Step for: {goal}" if goal else "")
+  goal = plan.get("goal") or ""
+  created = 0
+  skipped = 0
 
-    return f"Created {created} milestone event(s). Skipped {skipped}."
+  for m in milestones:
+    if not isinstance(m, dict):
+      skipped += 1
+      continue
+    title = (m.get("title") or "Milestone").strip()
+    due = _normalize_due(m.get("due") or m.get("date") or "")
+    if not due:
+      skipped += 1
+      continue
+    desc = m.get("description") or (f"Milestone for: {goal}" if goal else "")
+
+    before_len = len(events)
+    result = add_event(title=title, date=due, description=desc)
+    if result.startswith("Event added:"):
+      if len(events) > before_len:
+        events[-1]["milestone"] = True
+      created += 1
+    else:
+      skipped += 1
+
+  for m in milestones:
+    steps = m.get("steps") if isinstance(m, dict) else None
+    due = _normalize_due(m.get("due") or m.get("date") or "") if isinstance(m, dict) else ""
+    if not due or not isinstance(steps, list):
+      continue
+    for step in steps:
+      if not isinstance(step, str) or not step.strip():
+        continue
+      step_title = f"{(m.get('title') or 'Milestone').strip()} — {step.strip()}"
+      add_event(title=step_title, date=due, description=f"Step for: {goal}" if goal else "")
+
+  return f"Created {created} milestone event(s). Skipped {skipped}."
