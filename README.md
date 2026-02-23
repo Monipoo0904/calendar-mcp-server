@@ -64,6 +64,7 @@ Recurrence options (UI + server)
 Planning debug notes
 - `create_tasks` requires named input argument `plan`. Client requests must use:
   - `{"tool":"create_tasks","input":{"plan": <plan_object>}}`
+- After plan tasks are created, the UI prompts to export and downloads `.ics` from `/export.ics` when confirmed.
 - Browser planning diagnostics are logged with prefix `[plan-client]`.
 - Server handler diagnostics are logged with prefix `[mcp-handler]`.
 - If task creation fails, compare both logs first to confirm payload shape and tool validation path.

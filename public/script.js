@@ -58,6 +58,17 @@ function getApiUrl() {
   return `${origin}/api/mcp`;
 }
 
+function exportCalendarIcs() {
+  const origin = window.location.origin;
+  const url = (!origin || origin === 'null') ? '/export.ics' : `${origin}/export.ics`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'events.ics';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 function save() {
   try {
     localStorage.setItem('chat_messages', JSON.stringify(chat));
@@ -566,6 +577,16 @@ async function submitProjectGoal(goalText) {
               addLocalMessage(`✓ Added ${selectedCadence} reminders for all milestones.`, 'bot');
             } else if (wantsReminders) {
               addLocalMessage('Milestones created without recurring reminders.', 'bot');
+            }
+
+            const shouldExport = confirm(
+              'Would you like to export this plan as a calendar .ics file now?\n\n' +
+              'Click OK to download the .ics file, or Cancel to skip.'
+            );
+            if (shouldExport) {
+              logPlanClient('INFO', 'Exporting calendar .ics after plan creation');
+              exportCalendarIcs();
+              addLocalMessage('Downloading .ics export now.', 'bot');
             }
           } else {
             logPlanClient('ERROR', 'create_tasks failed', { taskData, taskText, status: resp.status });
