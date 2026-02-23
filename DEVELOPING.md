@@ -67,6 +67,17 @@ Developer notes — recent features and where to edit
 - Project planning + LLM: 
   - **Server-side**: `research_and_breakdown(goal, deadline)` tool in `main.py` calls OpenRouter API when `LLM_API_KEY` environment variable is set. Falls back to heuristic plan generation if LLM is unavailable.
   - **Client-side flow**: `public/script.js` implements the planning UI flow using browser prompts. When user types "plan" or clicks "Start Project", it prompts for goal, deadline (YYYY-MM-DD), then calls the `research_and_breakdown` tool via `/api/mcp`. The plan is displayed with a "Create tasks from plan" button that calls the `create_tasks` tool.
+  - **Create button rendering (important for edits)**:
+    - The plan action button is injected in `submitProjectGoal()` as a full chat message element (`<div class="message bot">`) containing avatar + bubble + button.
+    - Keep the button query scoped to that injected block (e.g., `actionEl.querySelector('.create-tasks-btn')`) so handlers are attached reliably.
+    - If the button disappears after changes, verify you are appending the full action element to `#messages` and that no later code removes/replaces it.
+  - **Cadence + reminders flow**:
+    - After clicking "Create tasks from plan", client prompts for cadence and whether reminders should be created.
+    - Task creation uses server tool `create_tasks`; reminder cadence uses `set_recurrence` per milestone.
+    - If you rename cadence values, keep them aligned with accepted `set_recurrence` frequency keys in `main.py`.
+  - **Prompt trigger dependency**:
+    - The quick "Start Project" button is text-triggered by the bot phrase `What would you like to accomplish?` in `interceptGoalPrompt()`.
+    - If you change that phrase, also update the regex trigger to avoid breaking the initial quick-start button.
   - **Important**: Planning flow is entirely client-side to avoid state issues in serverless deployments. The server only provides stateless tools (`research_and_breakdown`, `create_tasks`).
   - **Environment variable**: Set `LLM_API_KEY` in Vercel project settings for LLM-powered planning. Otherwise, heuristic plans are generated.
 - UI examples and guidance: update `public/index.html` (composer tooltip, `composerHelp`) and `public/script.js` (welcome bot message) to change the examples or instructions shown to users.
