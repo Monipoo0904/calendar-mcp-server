@@ -498,6 +498,7 @@ async function submitProjectGoal(goalText) {
           <div class="text">Ready to add these milestones to your calendar?</div>
           <div class="meta" style="margin-top:8px;">
             <button class="copy create-tasks-btn">Create tasks from plan</button>
+            <button class="copy export-ics-btn">Export .ics now</button>
           </div>
         </div>
       `;
@@ -505,6 +506,14 @@ async function submitProjectGoal(goalText) {
       messages.scrollTop = messages.scrollHeight;
 
       const createBtn = actionEl.querySelector('.create-tasks-btn');
+      const exportBtn = actionEl.querySelector('.export-ics-btn');
+
+      exportBtn.addEventListener('click', () => {
+        logPlanClient('INFO', 'Manual inline .ics export requested');
+        exportCalendarIcs();
+        addLocalMessage('Downloading .ics export now.', 'bot');
+      });
+
       createBtn.addEventListener('click', async () => {
         // Ask for cadence preference
         const cadenceChoice = prompt(
@@ -577,16 +586,6 @@ async function submitProjectGoal(goalText) {
               addLocalMessage(`✓ Added ${selectedCadence} reminders for all milestones.`, 'bot');
             } else if (wantsReminders) {
               addLocalMessage('Milestones created without recurring reminders.', 'bot');
-            }
-
-            const shouldExport = confirm(
-              'Would you like to export this plan as a calendar .ics file now?\n\n' +
-              'Click OK to download the .ics file, or Cancel to skip.'
-            );
-            if (shouldExport) {
-              logPlanClient('INFO', 'Exporting calendar .ics after plan creation');
-              exportCalendarIcs();
-              addLocalMessage('Downloading .ics export now.', 'bot');
             }
           } else {
             logPlanClient('ERROR', 'create_tasks failed', { taskData, taskText, status: resp.status });

@@ -74,7 +74,7 @@ Developer notes — recent features and where to edit
   - **Cadence + reminders flow**:
     - After clicking "Create tasks from plan", client prompts for cadence and whether reminders should be created.
     - Task creation uses server tool `create_tasks`; reminder cadence uses `set_recurrence` per milestone.
-    - After task/reminder creation succeeds, client prompts to export calendar data and triggers `.ics` download from `/export.ics` when confirmed.
+    - The same plan action panel includes an inline `Export .ics now` button that triggers download from `/export.ics`.
     - **Payload shape requirement**: `create_tasks` expects a named argument, so client requests must send `{"tool":"create_tasks","input":{"plan": <plan_object>}}` (not `input: plan_object` directly).
     - If you rename cadence values, keep them aligned with accepted `set_recurrence` frequency keys in `main.py`.
   - **Sanity logs for debugging**:
