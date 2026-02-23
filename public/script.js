@@ -39,6 +39,19 @@ async function parseJsonSafe(res) {
   }
 }
 
+function logPlanClient(level, message, details = null) {
+  const prefix = `[plan-client][${level}] ${message}`;
+  if (details === null || details === undefined) {
+    console.log(prefix);
+    return;
+  }
+  if (level === 'ERROR' || level === 'WARN') {
+    console.error(prefix, details);
+    return;
+  }
+  console.log(prefix, details);
+}
+
 function getApiUrl() {
   const origin = window.location.origin;
   if (!origin || origin === 'null') return '/api/mcp';
@@ -405,15 +418,18 @@ function showRecurrencePrompt(title){
 // Client helpers for the project planning flow
 
 async function submitProjectGoal(goalText) {
+  logPlanClient('INFO', 'Starting project plan flow', { goal: goalText });
   // prompt user for deadline
   const deadline = prompt('When would you like this done by? (YYYY-MM-DD)');
   if (deadline === null) return; // user canceled
   const deadlineTrim = deadline.trim();
   if (!deadlineTrim) {
+    logPlanClient('WARN', 'Deadline was empty');
     addLocalMessage('Please enter a deadline in YYYY-MM-DD to continue.', 'bot');
     return;
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(deadlineTrim)) {
+    logPlanClient('WARN', 'Deadline format invalid', { deadline: deadlineTrim });
     addLocalMessage('Invalid deadline format. Use YYYY-MM-DD (e.g., 2026-03-05).', 'bot');
     return;
   }
@@ -429,17 +445,20 @@ async function submitProjectGoal(goalText) {
     const { data, text: rawText } = await parseJsonSafe(res);
     if (res.ok && data?.result) {
       let plan = data.result;
+      logPlanClient('INFO', 'Received planning response', { resultType: typeof plan });
       // If plan is a string (shouldn't happen with the fix, but handle it), try to parse it
       if (typeof plan === 'string') {
         try {
           plan = JSON.parse(plan);
         } catch (e) {
+          logPlanClient('ERROR', 'Failed to parse string plan result', { rawPlan: plan });
           addLocalMessage('Error parsing plan: ' + plan, 'bot');
           return;
         }
       }
       // Validate plan structure
       if (!plan || !plan.milestones || !Array.isArray(plan.milestones)) {
+        logPlanClient('ERROR', 'Plan missing milestones array', plan);
         addLocalMessage('Invalid plan format received: ' + JSON.stringify(plan), 'bot');
         return;
       }
@@ -511,10 +530,11 @@ async function submitProjectGoal(goalText) {
           const resp = await fetch(getApiUrl(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tool: 'create_tasks', input: plan })
+            body: JSON.stringify({ tool: 'create_tasks', input: { plan } })
           });
           const { data: taskData, text: taskText } = await parseJsonSafe(resp);
           if (resp.ok && taskData?.result) {
+            logPlanClient('INFO', 'create_tasks succeeded');
             addLocalMessage(taskData.result, 'bot');
             
             // If user wants reminders and selected a cadence, set recurrence for each milestone
@@ -535,9 +555,11 @@ async function submitProjectGoal(goalText) {
                   });
                   const { data: recData } = await parseJsonSafe(recResp);
                   if (!recResp.ok) {
+                    logPlanClient('WARN', 'set_recurrence failed', { title: milestone.title, recData });
                     console.warn('Failed to set recurrence for', milestone.title, recData);
                   }
                 } catch (err) {
+                  logPlanClient('ERROR', 'set_recurrence threw error', { title: milestone.title, err: err?.message || String(err) });
                   console.warn('Error setting recurrence for', milestone.title, err);
                 }
               }
@@ -546,18 +568,22 @@ async function submitProjectGoal(goalText) {
               addLocalMessage('Milestones created without recurring reminders.', 'bot');
             }
           } else {
+            logPlanClient('ERROR', 'create_tasks failed', { taskData, taskText, status: resp.status });
             addLocalMessage('Failed to create tasks: ' + (taskData?.error || taskText || JSON.stringify(taskData)), 'bot');
           }
         } catch (err) {
+          logPlanClient('ERROR', 'Network error while creating tasks', { err: err?.message || String(err) });
           addLocalMessage('Network error creating tasks: ' + err.message, 'bot');
         } finally {
           setFetching(false);
         }
        });
     } else {
+      logPlanClient('ERROR', 'Planning request failed', { status: res.status, data, rawText });
       addLocalMessage('Failed to generate plan: ' + (data?.error || rawText || JSON.stringify(data)), 'bot');
     }
   } catch (err) {
+    logPlanClient('ERROR', 'Network error when generating plan', { err: err?.message || String(err) });
     addLocalMessage('Network error when generating plan: ' + err.message, 'bot');
   }
 }
