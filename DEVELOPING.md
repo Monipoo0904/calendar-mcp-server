@@ -106,6 +106,27 @@ Tips:
 - Adding UI elements: update the HTML markup and corresponding CSS classes; keep `messages` container as `role="log" aria-live="polite"` for screen readers.
 - Persisted state: `localStorage` is used for chat persistence — clear it to reset saved conversations.
 
+### Chat redesign coding notes
+- Scope entry points:
+  - Structure/layout: `public/index.html`
+  - Message rendering and behavior: `public/script.js` (`renderMessage`, `addLocalMessage`, `showTyping`, `setFetching`)
+  - Visual system and spacing: `public/style.css`
+- Keep these contracts stable during redesign:
+  - Message objects in `chat[]` keep shape `{ who, text, ts }` (used by persistence and renderer).
+  - `messages` container remains `role="log" aria-live="polite"` for accessibility.
+  - Planner quick actions still bind via class selectors (`.create-tasks-btn`, `.export-ics-btn`).
+- Safe redesign order:
+  1. Update `index.html` layout hooks/classes.
+  2. Refactor CSS blocks for container, message rows, and composer.
+  3. Adjust `renderMessage()` markup only after CSS is in place.
+  4. Re-test planning flow buttons and copy-button delegation.
+- Regression checklist after redesign:
+  - Welcome screen renders with Start Project shortcut.
+  - Plan generation still shows action panel (create/export buttons clickable).
+  - `clearConversation()` re-renders welcome state.
+  - Theme toggle still flips `data-theme` and remains readable in both modes.
+  - Long chats remain scrollable; input auto-resize still caps at max height.
+
 ---
 
 ## Editing the backend

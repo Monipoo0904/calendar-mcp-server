@@ -99,6 +99,15 @@ Frontend improvements:
 
 - Chat UI now supports typing indicator, timestamps, avatars, copy-to-clipboard buttons, Shift+Enter for newlines, Enter to send, and conversation persistence in `localStorage`. The composer shows a spinner while the backend responds and disables input until a reply is received.
 
+Chat redesign notes
+- Core files for UI redesign:
+  - `public/index.html` (layout)
+  - `public/style.css` (visual styling)
+  - `public/script.js` (`renderMessage`, `showTyping`, planner action bindings)
+- Keep planner action class hooks intact (`.create-tasks-btn`, `.export-ics-btn`) unless you also update JS selectors.
+- Preserve accessibility behavior on `#messages` (`role="log"` + `aria-live="polite"`).
+- Re-test plan flow end-to-end after redesign: plan generation → create tasks → export `.ics`.
+
 ## Development & Contributing
 
 If you plan to edit or extend this project, see `DEVELOPING.md` for a detailed developer guide (setup, editing the frontend and backend, testing, and deployment to Vercel).
