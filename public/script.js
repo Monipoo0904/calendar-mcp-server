@@ -460,9 +460,21 @@ async function submitProjectGoal(goalText) {
       addLocalMessage(lines.join('\n'), 'bot');
 
       // show quick action: "Create tasks" prompt with cadence and reminder options
-      const createBtn = document.createElement('button');
-      createBtn.textContent = 'Create tasks from plan';
-      createBtn.className = 'copy';
+      const actionEl = document.createElement('div');
+      actionEl.className = 'message bot';
+      actionEl.innerHTML = `
+        <div class="avatar">⭐</div>
+        <div class="bubble">
+          <div class="text">Ready to add these milestones to your calendar?</div>
+          <div class="meta" style="margin-top:8px;">
+            <button class="copy create-tasks-btn">Create tasks from plan</button>
+          </div>
+        </div>
+      `;
+      messages.appendChild(actionEl);
+      messages.scrollTop = messages.scrollHeight;
+
+      const createBtn = actionEl.querySelector('.create-tasks-btn');
       createBtn.addEventListener('click', async () => {
         // Ask for cadence preference
         const cadenceChoice = prompt(
@@ -542,12 +554,6 @@ async function submitProjectGoal(goalText) {
           setFetching(false);
         }
        });
-      // append to messages area
-      const wrapper = document.createElement('div');
-      wrapper.className = 'message bot';
-      wrapper.appendChild(createBtn);
-      messages.appendChild(wrapper);
-      messages.scrollTop = messages.scrollHeight;
     } else {
       addLocalMessage('Failed to generate plan: ' + (data?.error || rawText || JSON.stringify(data)), 'bot');
     }
