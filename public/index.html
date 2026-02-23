@@ -32,22 +32,7 @@
 
       <form id="form" class="composer" aria-label="Chat composer">
         <div class="composer-field">
-          <textarea id="input" rows="1" placeholder="" aria-label="Type a command or natural phrase, for example: Add Birthday on 2026-02-01; Add Meeting March 5 about planning; Add Lunch tomorrow" title="" aria-describedby="composerHelp composerTooltip" autocomplete="off"></textarea>
-          <div id="composerTooltip" class="composer-tooltip" role="status" aria-hidden="true">
-            <strong>How to plan a project (step‑by‑step):</strong>
-            <ol class="examples">
-              <li>Describe your high‑level goal (one sentence). e.g. “Build an iOS app”.</li>
-              <li>When prompted, enter a deadline (YYYY‑MM‑DD) or leave blank for a suggested horizon.</li>
-              <li>The assistant will produce a multi‑milestone plan and suggest cadences (daily/weekly/biweekly).</li>
-              <li>Review the plan and click “Create tasks from plan” to add milestones as calendar tasks.</li>
-              <li>After tasks are created you can choose a reminder cadence.</li>
-            </ol>
-            <div class="shorthand" style="margin-top:8px">
-              Quick input examples: <code>Add Meeting on 2026-02-01 at 14:30</code>, <code>Add Lunch tomorrow</code>, <code>add:Title|2026-03-03 09:00|Desc</code>.<br>
-              To delete: <code>delete:Title</code>. To list: <code>list</code>.
-            </div>
-          </div>
-          <span id="composerHelp" class="visually-hidden">Project flow steps: 1) Describe the goal (one sentence). 2) Provide a deadline when prompted (YYYY-MM-DD) or leave blank. 3) Review generated milestones and suggested cadence. 4) Click "Create tasks from plan" to add tasks. Quick examples: Add Meeting on 2026-02-01 at 14:30; Add Lunch tomorrow; delete:Title; list.</span>
+          <textarea id="input" rows="1" placeholder="" aria-label="Type a command or natural phrase" title="" autocomplete="off"></textarea>
         </div>
         <button id="sendBtn" type="submit" aria-label="Send message">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 21L23 12L2 3v7l15 2L2 14v7z" fill="currentColor"/></svg>
@@ -55,7 +40,6 @@
         <div id="spinner" class="spinner" aria-hidden="true" hidden></div>
       </form>
 
-      <p class="help">Examples: <code>list</code> (show all events), <code>summarize</code>, or natural phrases like "Add Birthday on 2026-02-01", "Add Meeting March 5 about planning", "Add Lunch tomorrow", or time-aware inputs like "Add Meeting on March 5 from 3pm to 5pm" and "Add Meeting on 2026-03-03 14:00-15:00". To delete: <code>delete:Title</code> or "delete Meeting". Shorthand: <code>add:Title|YYYY-MM-DD HH:MM|Desc</code>.</p>
     </main>
 
     <script src="/script.js"></script>
