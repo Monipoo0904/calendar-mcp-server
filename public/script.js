@@ -459,11 +459,40 @@ async function submitProjectGoal(goalText) {
       lines.push('Suggested cadences: ' + (plan.cadence_suggestions || []).join(', '));
       addLocalMessage(lines.join('\n'), 'bot');
 
-      // show quick action: "Create tasks" prompt (simple)
+      // show quick action: "Create tasks" prompt with cadence and reminder options
       const createBtn = document.createElement('button');
       createBtn.textContent = 'Create tasks from plan';
       createBtn.className = 'copy';
       createBtn.addEventListener('click', async () => {
+        // Ask for cadence preference
+        const cadenceChoice = prompt(
+          'Choose a reminder cadence for milestone check-ins:\n\n' +
+          '1 - Daily\n' +
+          '2 - Weekly\n' +
+          '3 - Biweekly\n' +
+          '4 - Monthly\n' +
+          '5 - None (no reminders)\n\n' +
+          'Enter 1-5:'
+        );
+        
+        if (cadenceChoice === null) return; // user canceled
+        
+        const cadenceMap = {
+          '1': 'daily',
+          '2': 'weekly', 
+          '3': 'biweekly',
+          '4': 'monthly',
+          '5': 'none'
+        };
+        
+        const selectedCadence = cadenceMap[cadenceChoice?.trim()] || 'none';
+        
+        // Ask if they want calendar reminders
+        const wantsReminders = confirm(
+          'Would you like to add calendar reminders for each milestone?\n\n' +
+          'Click OK to add reminders, or Cancel to skip.'
+        );
+        
         // call server tool to create tasks from the plan
         setFetching(true);
         try {
@@ -475,6 +504,35 @@ async function submitProjectGoal(goalText) {
           const { data: taskData, text: taskText } = await parseJsonSafe(resp);
           if (resp.ok && taskData?.result) {
             addLocalMessage(taskData.result, 'bot');
+            
+            // If user wants reminders and selected a cadence, set recurrence for each milestone
+            if (wantsReminders && selectedCadence !== 'none') {
+              for (const milestone of plan.milestones) {
+                try {
+                  const recResp = await fetch(getApiUrl(), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                      tool: 'set_recurrence', 
+                      input: { 
+                        title: milestone.title, 
+                        frequency: selectedCadence,
+                        interval: 1
+                      }
+                    })
+                  });
+                  const { data: recData } = await parseJsonSafe(recResp);
+                  if (!recResp.ok) {
+                    console.warn('Failed to set recurrence for', milestone.title, recData);
+                  }
+                } catch (err) {
+                  console.warn('Error setting recurrence for', milestone.title, err);
+                }
+              }
+              addLocalMessage(`✓ Added ${selectedCadence} reminders for all milestones.`, 'bot');
+            } else if (wantsReminders) {
+              addLocalMessage('Milestones created without recurring reminders.', 'bot');
+            }
           } else {
             addLocalMessage('Failed to create tasks: ' + (taskData?.error || taskText || JSON.stringify(taskData)), 'bot');
           }
