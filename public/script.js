@@ -69,6 +69,29 @@ function exportCalendarIcs() {
   document.body.removeChild(a);
 }
 
+function showIcsExportButton(message = 'Ready to export your calendar file?') {
+  const actionEl = document.createElement('div');
+  actionEl.className = 'message bot';
+  actionEl.innerHTML = `
+    <div class="avatar">⭐</div>
+    <div class="bubble">
+      <div class="text">${escapeHtml(message)}</div>
+      <div class="meta" style="margin-top:8px;">
+        <button class="copy export-ics-btn plan-primary-btn">Export .ics</button>
+      </div>
+    </div>
+  `;
+  messages.appendChild(actionEl);
+  messages.scrollTop = messages.scrollHeight;
+
+  const exportBtn = actionEl.querySelector('.export-ics-btn');
+  exportBtn?.addEventListener('click', () => {
+    logPlanClient('INFO', 'Inline .ics export requested');
+    exportCalendarIcs();
+    addLocalMessage('Downloading .ics export now.', 'bot');
+  });
+}
+
 function save() {
   try {
     localStorage.setItem('chat_messages', JSON.stringify(chat));
@@ -609,9 +632,11 @@ async function submitProjectGoal(goalText) {
                 exportCalendarIcs();
                 addLocalMessage('Confirmed. Downloading .ics export now.', 'bot');
               } else if (exportWhere === 'ics' && exportWhen === 'after review') {
-                addLocalMessage('Review complete. When ready, click the export button in this chat to download .ics.', 'bot');
+                addLocalMessage('Review complete. Use the button below when you are ready to export.', 'bot');
+                showIcsExportButton('Export milestones to .ics when ready.');
               } else {
                 addLocalMessage(`Confirmed. Export target '${exportWhere}' selected. (Current automated file export supports .ics download.)`, 'bot');
+                showIcsExportButton('If needed, you can still export these milestones as .ics.');
               }
             } else {
               logPlanClient('ERROR', 'create_tasks failed', { taskData, taskText, status: resp.status });
