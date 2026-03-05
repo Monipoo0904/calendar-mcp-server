@@ -971,7 +971,17 @@ def create_tasks(plan: dict) -> str:
     if not due:
       skipped += 1
       continue
-    desc = m.get("description") or (f"Milestone for: {goal}" if goal else "")
+    steps = m.get("steps") if isinstance(m.get("steps"), list) else []
+    checklist = [f"- {str(step).strip()}" for step in steps if isinstance(step, str) and str(step).strip()]
+    desc_lines = []
+    if goal:
+      desc_lines.append(f"Goal: {goal}")
+    if m.get("description"):
+      desc_lines.append(str(m.get("description")).strip())
+    if checklist:
+      desc_lines.append("What needs to be completed:")
+      desc_lines.extend(checklist)
+    desc = "\n".join(desc_lines).strip()
 
     before_len = len(events)
     add_event(title=title, date=due, description=desc)
@@ -981,16 +991,5 @@ def create_tasks(plan: dict) -> str:
       created += 1
     else:
       skipped += 1
-
-  for m in milestones:
-    steps = m.get("steps") if isinstance(m, dict) else None
-    due = _normalize_due(m.get("due") or m.get("date") or "") if isinstance(m, dict) else ""
-    if not due or not isinstance(steps, list):
-      continue
-    for step in steps:
-      if not isinstance(step, str) or not step.strip():
-        continue
-      step_title = f"{(m.get('title') or 'Milestone').strip()} — {step.strip()}"
-      add_event(title=step_title, date=due, description=f"Step for: {goal}" if goal else "")
 
   return f"Created {created} milestone event(s). Skipped {skipped}. These are now included in /export.ics."

@@ -477,10 +477,9 @@ async function submitProjectGoal(goalText) {
       actionEl.innerHTML = `
         <div class="avatar">⭐</div>
         <div class="bubble">
-          <div class="text">Ready to add these milestones to your calendar?</div>
+          <div class="text">Ready to prepare a calendar export for this plan?</div>
           <div class="meta" style="margin-top:8px;">
-            <button class="copy create-tasks-btn plan-primary-btn">Create tasks from plan</button>
-            <button class="copy export-ics-btn plan-secondary-btn">Export .ics now</button>
+            <button class="copy create-tasks-btn plan-primary-btn">Prepare export</button>
           </div>
         </div>
       `;
@@ -488,15 +487,29 @@ async function submitProjectGoal(goalText) {
       messages.scrollTop = messages.scrollHeight;
 
       const createBtn = actionEl.querySelector('.create-tasks-btn');
-      const exportBtn = actionEl.querySelector('.export-ics-btn');
-
-      exportBtn.addEventListener('click', () => {
-        logPlanClient('INFO', 'Manual inline .ics export requested');
-        exportCalendarIcs();
-        addLocalMessage('Downloading .ics export now.', 'bot');
-      });
 
       createBtn.addEventListener('click', async () => {
+        const exportWhereRaw = prompt(
+          'Where do you want to export this plan?\n\n' +
+          'Type one:\n' +
+          '- google\n' +
+          '- microsoft\n' +
+          '- ics\n\n' +
+          'Default is ics.'
+        );
+        if (exportWhereRaw === null) return;
+        const exportWhere = (exportWhereRaw || 'ics').trim().toLowerCase() || 'ics';
+
+        const exportWhenRaw = prompt(
+          'When should the export happen?\n\n' +
+          'Type one:\n' +
+          '- now\n' +
+          '- after review\n\n' +
+          'Default is now.'
+        );
+        if (exportWhenRaw === null) return;
+        const exportWhen = (exportWhenRaw || 'now').trim().toLowerCase() || 'now';
+
         // Ask for cadence preference
         const cadenceChoice = prompt(
           'Choose a reminder cadence for milestone check-ins:\n\n' +
@@ -525,60 +538,92 @@ async function submitProjectGoal(goalText) {
           'Would you like to add calendar reminders for each milestone?\n\n' +
           'Click OK to add reminders, or Cancel to skip.'
         );
+
+        const confirmEl = document.createElement('div');
+        confirmEl.className = 'message bot';
+        confirmEl.innerHTML = `
+          <div class="avatar">⭐</div>
+          <div class="bubble">
+            <div class="text">Review export settings:\n• Where: ${escapeHtml(exportWhere)}\n• When: ${escapeHtml(exportWhen)}\n• Reminders: ${wantsReminders ? escapeHtml(selectedCadence) : 'none'}</div>
+            <div class="meta" style="margin-top:8px;">
+              <button class="copy confirm-export-btn plan-primary-btn">Confirm export</button>
+            </div>
+          </div>
+        `;
+        messages.appendChild(confirmEl);
+        messages.scrollTop = messages.scrollHeight;
+
+        const confirmBtn = confirmEl.querySelector('.confirm-export-btn');
+        if (!confirmBtn) return;
+
+        confirmBtn.addEventListener('click', async () => {
+          confirmBtn.disabled = true;
+          confirmBtn.textContent = 'Exporting…';
         
-        // call server tool to create tasks from the plan
-        setFetching(true);
-        try {
-          const resp = await fetch(getApiUrl(), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tool: 'create_tasks', input: { plan } })
-          });
-          const { data: taskData, text: taskText } = await parseJsonSafe(resp);
-          if (resp.ok && taskData?.result) {
-            logPlanClient('INFO', 'create_tasks succeeded');
-            addLocalMessage(taskData.result, 'bot');
+          // call server tool to create tasks from the plan
+          setFetching(true);
+          try {
+            const resp = await fetch(getApiUrl(), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tool: 'create_tasks', input: { plan } })
+            });
+            const { data: taskData, text: taskText } = await parseJsonSafe(resp);
+            if (resp.ok && taskData?.result) {
+              logPlanClient('INFO', 'create_tasks succeeded');
+              addLocalMessage(taskData.result, 'bot');
             
-            // If user wants reminders and selected a cadence, set recurrence for each milestone
-            if (wantsReminders && selectedCadence !== 'none') {
-              for (const milestone of plan.milestones) {
-                try {
-                  const recResp = await fetch(getApiUrl(), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                      tool: 'set_recurrence', 
-                      input: { 
-                        title: milestone.title, 
-                        frequency: selectedCadence,
-                        interval: 1
-                      }
-                    })
-                  });
-                  const { data: recData } = await parseJsonSafe(recResp);
-                  if (!recResp.ok) {
-                    logPlanClient('WARN', 'set_recurrence failed', { title: milestone.title, recData });
-                    console.warn('Failed to set recurrence for', milestone.title, recData);
+              // If user wants reminders and selected a cadence, set recurrence for each milestone
+              if (wantsReminders && selectedCadence !== 'none') {
+                for (const milestone of plan.milestones) {
+                  try {
+                    const recResp = await fetch(getApiUrl(), {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ 
+                        tool: 'set_recurrence', 
+                        input: { 
+                          title: milestone.title, 
+                          frequency: selectedCadence,
+                          interval: 1
+                        }
+                      })
+                    });
+                    const { data: recData } = await parseJsonSafe(recResp);
+                    if (!recResp.ok) {
+                      logPlanClient('WARN', 'set_recurrence failed', { title: milestone.title, recData });
+                      console.warn('Failed to set recurrence for', milestone.title, recData);
+                    }
+                  } catch (err) {
+                    logPlanClient('ERROR', 'set_recurrence threw error', { title: milestone.title, err: err?.message || String(err) });
+                    console.warn('Error setting recurrence for', milestone.title, err);
                   }
-                } catch (err) {
-                  logPlanClient('ERROR', 'set_recurrence threw error', { title: milestone.title, err: err?.message || String(err) });
-                  console.warn('Error setting recurrence for', milestone.title, err);
                 }
+                addLocalMessage(`✓ Added ${selectedCadence} reminders for all milestones.`, 'bot');
+              } else if (wantsReminders) {
+                addLocalMessage('Milestones created without recurring reminders.', 'bot');
               }
-              addLocalMessage(`✓ Added ${selectedCadence} reminders for all milestones.`, 'bot');
-            } else if (wantsReminders) {
-              addLocalMessage('Milestones created without recurring reminders.', 'bot');
+
+              if (exportWhere === 'ics' && exportWhen !== 'after review') {
+                logPlanClient('INFO', 'Confirmed .ics export requested');
+                exportCalendarIcs();
+                addLocalMessage('Confirmed. Downloading .ics export now.', 'bot');
+              } else if (exportWhere === 'ics' && exportWhen === 'after review') {
+                addLocalMessage('Review complete. When ready, click the export button in this chat to download .ics.', 'bot');
+              } else {
+                addLocalMessage(`Confirmed. Export target '${exportWhere}' selected. (Current automated file export supports .ics download.)`, 'bot');
+              }
+            } else {
+              logPlanClient('ERROR', 'create_tasks failed', { taskData, taskText, status: resp.status });
+              addLocalMessage('Failed to create tasks: ' + (taskData?.error || taskText || JSON.stringify(taskData)), 'bot');
             }
-          } else {
-            logPlanClient('ERROR', 'create_tasks failed', { taskData, taskText, status: resp.status });
-            addLocalMessage('Failed to create tasks: ' + (taskData?.error || taskText || JSON.stringify(taskData)), 'bot');
+          } catch (err) {
+            logPlanClient('ERROR', 'Network error while creating tasks', { err: err?.message || String(err) });
+            addLocalMessage('Network error creating tasks: ' + err.message, 'bot');
+          } finally {
+            setFetching(false);
           }
-        } catch (err) {
-          logPlanClient('ERROR', 'Network error while creating tasks', { err: err?.message || String(err) });
-          addLocalMessage('Network error creating tasks: ' + err.message, 'bot');
-        } finally {
-          setFetching(false);
-        }
+        });
        });
     } else {
       logPlanClient('ERROR', 'Planning request failed', { status: res.status, data, rawText });
