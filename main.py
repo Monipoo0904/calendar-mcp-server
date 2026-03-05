@@ -970,10 +970,10 @@ def create_tasks(plan: dict) -> str:
     desc = m.get("description") or (f"Milestone for: {goal}" if goal else "")
 
     before_len = len(events)
-    result = add_event(title=title, date=due, description=desc)
-    if result.startswith("Event added:"):
-      if len(events) > before_len:
-        events[-1]["milestone"] = True
+    add_event(title=title, date=due, description=desc)
+    if len(events) > before_len:
+      events[-1]["milestone"] = True
+      events[-1]["source"] = "plan_milestone"
       created += 1
     else:
       skipped += 1
@@ -989,4 +989,4 @@ def create_tasks(plan: dict) -> str:
       step_title = f"{(m.get('title') or 'Milestone').strip()} — {step.strip()}"
       add_event(title=step_title, date=due, description=f"Step for: {goal}" if goal else "")
 
-  return f"Created {created} milestone event(s). Skipped {skipped}."
+  return f"Created {created} milestone event(s). Skipped {skipped}. These are now included in /export.ics."
