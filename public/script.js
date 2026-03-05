@@ -194,16 +194,7 @@ load();
 if (chat.length){
   chat.forEach(renderMessage);
 } else {
-  const welcomeMsg = `Welcome! I can help you manage events and plan projects.
-
-What would you like to accomplish?
-
-You can also use commands like:
-• "list" — show all events
-• "Add Birthday on 2026-02-01" — add an event
-• "Add Meeting on 2026-02-01 at 14:30" — add a timed event
-• "summarize" — get a summary of upcoming events
-• "delete:EventTitle" — remove an event`;
+  const welcomeMsg = `What would you like to accomplish? (Describe your goal and I'll help you plan it out.)`;
   addLocalMessage(welcomeMsg, 'bot');
   messages.scrollTop = messages.scrollHeight;
 }
@@ -286,16 +277,7 @@ function clearConversation(){
   save();
   messages.innerHTML = '';
   // Re-show welcome message with planning trigger
-  const welcomeMsg = `Welcome! I can help you manage events and plan projects.
-
-What would you like to accomplish?
-
-You can also use commands like:
-• "list" — show all events
-• "Add Birthday on 2026-02-01" — add an event
-• "Add Meeting on 2026-02-01 at 14:30" — add a timed event
-• "summarize" — get a summary of upcoming events
-• "delete:EventTitle" — remove an event`;
+  const welcomeMsg = `What would you like to accomplish? (Describe your goal and I'll help you plan it out.)`;
   addLocalMessage(welcomeMsg, 'bot');
 }
 clearBtn?.addEventListener('click', clearConversation);
