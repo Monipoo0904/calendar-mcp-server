@@ -428,7 +428,11 @@ def handle_message(message: str) -> str:
     return delete_event(title)
 
   # For project planning, guide users to use the client-side flow or call research_and_breakdown tool directly
-  if any(k in low for k in ("plan", "project", "goal", "accomplish", "breakdown")):
+  planning_keywords = (
+    "plan", "project", "goal", "accomplish", "breakdown",
+    "build", "develop", "launch", "ship", "roadmap", "milestone"
+  )
+  if any(k in low for k in planning_keywords):
     return "What would you like to accomplish? (Describe your goal and I'll help you plan it out.)"
 
   # Fallback help text (should rarely hit)
