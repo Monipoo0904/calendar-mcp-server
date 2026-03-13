@@ -2,7 +2,7 @@ from mcp.server.fastmcp import FastMCP
 from typing import List, Dict 
 from datetime import datetime 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 # -----------------------------------------
@@ -17,6 +17,8 @@ from fastapi.staticfiles import StaticFiles
 import os
 import json
 import httpx
+import secrets
+from urllib.parse import urlencode
 from datetime import datetime, timedelta
 
 # Create an MCP server 
@@ -913,6 +915,120 @@ async def root_index():
     if os.path.exists(index_path):
         return FileResponse(index_path, media_type="text/html")
     return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
+
+# Outlook/Microsoft OAuth start endpoint
+# - Called by the top "Connect to Microsoft Calendar" button in public/script.js.
+# - Builds a Microsoft authorize URL using env configuration.
+# - Required env var: MS_CLIENT_ID (or MICROSOFT_CLIENT_ID).
+# - Optional env vars:
+#   - MS_TENANT_ID (default: common)
+#   - MS_REDIRECT_URI (default: <base>/redirect_microsoft.html)
+#   - MS_SCOPES (default: offline_access User.Read Calendars.ReadWrite)
+# - On success, Microsoft redirects to /api/oauth/microsoft/callback which exchanges
+#   the code and fetches profile name from Microsoft Graph.
+@app.get("/api/oauth/microsoft/start", include_in_schema=False)
+async def oauth_microsoft_start(request: Request):
+  client_id = os.getenv("MS_CLIENT_ID") or os.getenv("MICROSOFT_CLIENT_ID")
+  if not client_id:
+    return JSONResponse(
+      status_code=501,
+      content={
+        "error": "Microsoft OAuth is not configured. Set MS_CLIENT_ID in environment variables.",
+        "setup": {
+          "required": ["MS_CLIENT_ID"],
+          "optional": ["MS_TENANT_ID", "MS_REDIRECT_URI", "MS_SCOPES"],
+        },
+      },
+    )
+
+  tenant_id = os.getenv("MS_TENANT_ID", "common").strip() or "common"
+  scope = os.getenv("MS_SCOPES", "offline_access User.Read Calendars.ReadWrite")
+  redirect_uri = os.getenv("MS_REDIRECT_URI", "").strip()
+  if not redirect_uri:
+    base = str(request.base_url).rstrip("/")
+    redirect_uri = f"{base}/api/oauth/microsoft/callback"
+
+  state = secrets.token_urlsafe(24)
+  params = {
+    "client_id": client_id,
+    "response_type": "code",
+    "redirect_uri": redirect_uri,
+    "response_mode": "query",
+    "scope": scope,
+    "state": state,
+  }
+  auth_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/authorize?{urlencode(params)}"
+  return JSONResponse(status_code=200, content={"auth_url": auth_url})
+
+
+# Microsoft OAuth callback
+# - Exchanges auth code for token, then queries Graph /me for display name.
+# - Redirects user back to app with query params consumed by public/script.js:
+#   - ms_name: display name for header UI
+#   - ms_provider: provider marker (microsoft)
+#   - ms_error: present if callback/token/profile lookup failed
+@app.get("/api/oauth/microsoft/callback", include_in_schema=False)
+async def oauth_microsoft_callback(request: Request):
+  base = str(request.base_url).rstrip("/")
+  app_redirect = f"{base}/index.html"
+
+  err = request.query_params.get("error", "")
+  if err:
+    return RedirectResponse(url=f"{app_redirect}?ms_error={err}&ms_provider=microsoft", status_code=302)
+
+  code = request.query_params.get("code", "")
+  if not code:
+    return RedirectResponse(url=f"{app_redirect}?ms_error=missing_code&ms_provider=microsoft", status_code=302)
+
+  client_id = os.getenv("MS_CLIENT_ID") or os.getenv("MICROSOFT_CLIENT_ID")
+  client_secret = os.getenv("MS_CLIENT_SECRET", "")
+  tenant_id = os.getenv("MS_TENANT_ID", "common").strip() or "common"
+  scope = os.getenv("MS_SCOPES", "offline_access User.Read Calendars.ReadWrite")
+  redirect_uri = os.getenv("MS_REDIRECT_URI", "").strip() or f"{base}/api/oauth/microsoft/callback"
+
+  if not client_id or not client_secret:
+    return RedirectResponse(url=f"{app_redirect}?ms_error=missing_ms_client_config&ms_provider=microsoft", status_code=302)
+
+  token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+  token_data = {
+    "client_id": client_id,
+    "client_secret": client_secret,
+    "grant_type": "authorization_code",
+    "code": code,
+    "redirect_uri": redirect_uri,
+    "scope": scope,
+  }
+
+  try:
+    token_resp = httpx.post(token_url, data=token_data, timeout=20.0)
+    if token_resp.status_code != 200:
+      return RedirectResponse(url=f"{app_redirect}?ms_error=token_exchange_failed&ms_provider=microsoft", status_code=302)
+    token_json = token_resp.json()
+    access_token = token_json.get("access_token", "")
+    if not access_token:
+      return RedirectResponse(url=f"{app_redirect}?ms_error=missing_access_token&ms_provider=microsoft", status_code=302)
+
+    me_resp = httpx.get(
+      "https://graph.microsoft.com/v1.0/me?$select=displayName,givenName,mail,userPrincipalName",
+      headers={"Authorization": f"Bearer {access_token}"},
+      timeout=20.0,
+    )
+    if me_resp.status_code != 200:
+      return RedirectResponse(url=f"{app_redirect}?ms_error=profile_fetch_failed&ms_provider=microsoft", status_code=302)
+
+    profile = me_resp.json()
+    display_name = (
+      profile.get("displayName")
+      or profile.get("givenName")
+      or profile.get("mail")
+      or profile.get("userPrincipalName")
+      or "Microsoft User"
+    )
+    qs = urlencode({"ms_name": display_name, "ms_provider": "microsoft", "ms_connected": "1"})
+    return RedirectResponse(url=f"{app_redirect}?{qs}", status_code=302)
+  except Exception:
+    return RedirectResponse(url=f"{app_redirect}?ms_error=oauth_callback_exception&ms_provider=microsoft", status_code=302)
 
 
 @app.get("/export.ics", include_in_schema=False)

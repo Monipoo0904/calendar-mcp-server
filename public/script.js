@@ -26,9 +26,61 @@ const sendBtn = document.getElementById('sendBtn');
 const clearBtn = document.getElementById('clearBtn');
 const clearBtnTop = document.getElementById('clearBtnTop');
 const themeToggle = document.getElementById('themeToggle');
+const connectedUserNameEl = document.getElementById('connectedUserName');
 
 let chat = [] // persisted messages
 let typingEl = null
+
+/*
+Developer notes (OAuth buttons)
+- Microsoft button behavior:
+  - Click handler calls `startMicrosoftCalendarConnect()`.
+  - Client requests `/api/oauth/microsoft/start`.
+  - Server returns `auth_url` and browser performs top-level redirect.
+- Callback behavior:
+  - Server callback redirects to index with `ms_name` query parameter.
+  - Client stores the name in localStorage key `ms_connected_user_name` and
+    renders it in the top-right header as "Connected: <name>".
+- If backend config is missing (MS_CLIENT_ID), we keep a safe fallback to
+  `redirect_microsoft.html` so the button still responds during local testing.
+- Google button remains a local test path unless a real Google OAuth flow is restored.
+*/
+
+function setConnectedUserName(name) {
+  if (!connectedUserNameEl) return;
+  const trimmed = String(name || '').trim();
+  if (!trimmed) {
+    connectedUserNameEl.hidden = true;
+    connectedUserNameEl.textContent = '';
+    return;
+  }
+  connectedUserNameEl.hidden = false;
+  connectedUserNameEl.textContent = `Connected: ${trimmed}`;
+}
+
+function hydrateMicrosoftIdentityFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const msName = params.get('ms_name');
+  const msError = params.get('ms_error');
+
+  if (msName) {
+    localStorage.setItem('ms_connected_user_name', msName);
+    setConnectedUserName(msName);
+    addLocalMessage(`Connected to Microsoft Calendar as ${msName}.`, 'bot');
+  } else {
+    const saved = localStorage.getItem('ms_connected_user_name') || '';
+    if (saved) setConnectedUserName(saved);
+  }
+
+  if (msError) {
+    addLocalMessage(`Microsoft connection error: ${msError}`, 'bot');
+  }
+
+  // Clean OAuth query params from the URL after they are processed.
+  if (msName || msError || params.get('ms_provider') || params.get('ms_connected')) {
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+}
 
 async function parseJsonSafe(res) {
   const text = await res.text();
@@ -683,7 +735,7 @@ if (chat.length){
 // accessibility: focus input on load
 window.addEventListener('load', ()=> input.focus());
   
-  // OAuth sign-in helpers
+  // OAuth sign-in helper (legacy MCP-tool path; kept for compatibility if re-enabled).
   async function startOauth(provider) {
     try {
       const resp = await fetch(getApiUrl(), {
@@ -710,6 +762,31 @@ window.addEventListener('load', ()=> input.focus());
     }
   }
 
+  // Preferred Microsoft/Outlook connect flow used by the top header button.
+  async function startMicrosoftCalendarConnect() {
+    try {
+      const origin = window.location.origin;
+      const url = (!origin || origin === 'null')
+        ? '/api/oauth/microsoft/start'
+        : `${origin}/api/oauth/microsoft/start`;
+      const resp = await fetch(url, { method: 'GET' });
+      const { data, text } = await parseJsonSafe(resp);
+      const authUrl = data?.auth_url;
+      if (resp.ok && authUrl) {
+        addLocalMessage('Opening Microsoft sign-in...', 'bot');
+        window.location.href = authUrl;
+        return;
+      }
+
+      // Local/dev fallback so button still behaves even before env vars are configured.
+      addLocalMessage('Microsoft OAuth is not configured yet. Opening fallback page.', 'bot');
+      window.location.href = '/redirect_microsoft.html';
+    } catch (err) {
+      addLocalMessage('Could not start Microsoft Calendar connect flow. Using fallback page.', 'bot');
+      window.location.href = '/redirect_microsoft.html';
+    }
+  }
+
   const gbtn = document.getElementById('signinGoogle');
   const mbtn = document.getElementById('signinMicrosoft');
   // For testing locally we provide a simple test handler that doesn't perform OAuth.
@@ -731,10 +808,11 @@ window.addEventListener('load', ()=> input.focus());
   }
 
   if (gbtn) gbtn.addEventListener('click', () => testSignIn('Google'));
-  if (mbtn) mbtn.addEventListener('click', () => testSignIn('Microsoft'));
+  if (mbtn) mbtn.addEventListener('click', () => startMicrosoftCalendarConnect());
 
 // Keep theme set when page loads
 loadTheme();
+hydrateMicrosoftIdentityFromUrl();
 
 // Event delegation for copy buttons
 messages.addEventListener('click', (e) => {

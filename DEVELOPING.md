@@ -89,6 +89,15 @@ Developer notes — recent features and where to edit
 - UI examples and guidance: update `public/index.html` (composer tooltip, `composerHelp`) and `public/script.js` (welcome bot message) to change the examples or instructions shown to users.
 - Styling: `public/style.css` contains variables at the top (`:root`) and the `auth-button` class used by the Connect and Export buttons.
 
+- Outlook connect button (Microsoft Calendar):
+  - Frontend click handler lives in `public/script.js` (`startMicrosoftCalendarConnect`).
+  - Backend URL builder endpoint is `GET /api/oauth/microsoft/start` in `main.py`.
+  - Backend callback endpoint is `GET /api/oauth/microsoft/callback` (token exchange + Graph `/me`).
+  - Required env vars for real OAuth: `MS_CLIENT_ID` (or `MICROSOFT_CLIENT_ID`) and `MS_CLIENT_SECRET`.
+  - Optional env vars: `MS_TENANT_ID`, `MS_REDIRECT_URI`, `MS_SCOPES`.
+  - Header identity rendering: `setConnectedUserName()` + `hydrateMicrosoftIdentityFromUrl()` in `public/script.js`.
+  - Top-corner display node is `#connectedUserName` in `public/index.html` and styled in `public/style.css`.
+
 Suggested edit flow
 1. Update parsing logic in `main.py` and write unit tests for `find_date_in_msg()` and `parse_time_token()`.
 2. Update UI examples in `public/index.html` and `public/script.js` to reflect new behaviors.

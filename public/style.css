@@ -58,6 +58,7 @@ body{margin:0;font-family:Inter,Helvetica,Arial,sans-serif;background:var(--bg);
 .subtitle{margin:0;font-size:0.82rem;color:var(--muted)}
 .controls{display:flex;gap:8px;align-items:center}
 .icon-btn{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px;color:var(--muted);cursor:pointer}
+.connected-user{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid rgba(0,0,0,0.08);background:rgba(34,197,94,0.10);color:#14532d;font-size:0.82rem;font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .auth-controls{display:flex;gap:8px;align-items:center}
 .auth-controls .auth-button{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:999px;border:1px solid rgba(0,0,0,0.06);background:var(--panel-bg);color:var(--text);cursor:pointer;font-weight:600;box-shadow:0 8px 20px rgba(16,24,40,0.06);transition:transform 160ms ease, box-shadow 160ms ease}
 .auth-controls .auth-button:hover{transform:translateY(-3px);box-shadow:0 14px 30px rgba(16,24,40,0.10)}

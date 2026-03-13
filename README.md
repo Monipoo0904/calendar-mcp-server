@@ -25,6 +25,25 @@ Deploy to Vercel
 2. Run `vercel deploy` and follow prompts.
 3. Your serverless endpoint will be available at `https://<project>.vercel.app/api/mcp`.
 
+Microsoft Outlook connect (top button)
+
+- The header button `Connect to Microsoft Calendar` now calls backend endpoint:
+  - `GET /api/oauth/microsoft/start`
+- This endpoint builds a Microsoft OAuth authorize URL and redirects the browser.
+- OAuth callback endpoint:
+  - `GET /api/oauth/microsoft/callback`
+  - Exchanges authorization code for token, fetches `displayName` from Graph `/me`, then redirects to `index.html` with `ms_name` query param.
+  - Frontend reads `ms_name` and shows `Connected: <name>` in the top-right header.
+- Required environment variable:
+  - `MS_CLIENT_ID` (or `MICROSOFT_CLIENT_ID`)
+- Required for callback token exchange:
+  - `MS_CLIENT_SECRET`
+- Optional environment variables:
+  - `MS_TENANT_ID` (default: `common`)
+  - `MS_REDIRECT_URI` (default: `<base>/api/oauth/microsoft/callback`)
+  - `MS_SCOPES` (default: `offline_access User.Read Calendars.ReadWrite`)
+- If config is missing, frontend falls back to `public/redirect_microsoft.html` so the button still responds in dev.
+
 Notes
 
 - Vercel serverless functions are stateless — events are stored in-memory and **will reset** frequently.
