@@ -940,10 +940,7 @@ function interceptGoalPrompt(text) {
       quick.remove();
     });
     document.getElementById('studentPlansBtn').addEventListener('click', async () => {
-      const names = prompt('Optional: enter student names separated by commas (or leave blank for all).');
-      const q = names && names.trim()
-        ? `Create personalized lesson plans for ${names.trim()}`
-        : 'Create personalized lesson plans for all students';
+      const q = 'Create personalized lesson plans for all students';
       addLocalMessage(q, 'user');
       setFetching(true);
       showTyping();
