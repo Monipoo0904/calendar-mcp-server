@@ -159,8 +159,10 @@ Student planning flow notes (frontend)
     to avoid accidental over-filtering.
   - showStudentButtonSelector() supports both single-select and multi-select modes.
 */
-async function submitPersonalizedLessonPlans(userText) {
+async function submitPersonalizedLessonPlans(userText, flowOptions = {}) {
   const requestedStudents = extractRequestedStudentNames(userText);
+  const lessonGoal = String(flowOptions?.lessonGoal || '').trim();
+  const deadline = String(flowOptions?.deadline || '').trim();
   try {
     const res = await fetch(getApiUrl(), {
       method: 'POST',
@@ -169,7 +171,8 @@ async function submitPersonalizedLessonPlans(userText) {
         tool: 'personalized_lesson_plans',
         input: {
           students: requestedStudents,
-          lesson_goal: '',
+          lesson_goal: lessonGoal,
+          deadline,
           max_students: 12,
         }
       })
@@ -187,7 +190,18 @@ async function submitPersonalizedLessonPlans(userText) {
       }
       if (result?.summary) {
         addLocalMessage(result.summary, 'bot');
-        showStudentCalendarActions(result);
+        const suggestions = Array.isArray(result?.recommended_additional_students)
+          ? result.recommended_additional_students
+          : [];
+        if (suggestions.length) {
+          const lines = ['Based on your project goal, consider adding:'];
+          suggestions.forEach((s) => {
+            const strengths = Array.isArray(s?.matched_strengths) ? s.matched_strengths.join(', ') : '';
+            lines.push(`- ${s.student}${strengths ? ` (${strengths})` : ''}`);
+          });
+          addLocalMessage(lines.join('\n'), 'bot');
+        }
+        showStudentCalendarActions(result, flowOptions);
         return;
       }
       addLocalMessage('Personalized lesson plans generated, but the response format was unexpected.', 'bot');
@@ -362,9 +376,17 @@ function buildCalendarPlanFromStudentLesson(selectedPlan, startDateStr, cadenceD
   };
 }
 
-function showStudentCalendarActions(result) {
+function showStudentCalendarActions(result, flowOptions = {}) {
   const lessonPlans = Array.isArray(result?.lesson_plans) ? result.lesson_plans : [];
   const availableStudents = Array.isArray(result?.available_students) ? result.available_students : lessonPlans.map((p) => p.student).filter(Boolean);
+  const preselectedStudents = Array.isArray(flowOptions?.preselectedStudents)
+    ? flowOptions.preselectedStudents.filter(Boolean)
+    : [];
+
+  const preselectedPlans = preselectedStudents.length
+    ? lessonPlans.filter((p) => preselectedStudents.includes(p.student))
+    : [];
+
   if (!availableStudents.length) return;
 
   const actionEl = document.createElement('div');
@@ -374,7 +396,7 @@ function showStudentCalendarActions(result) {
     <div class="bubble">
       <div class="text">Ready to schedule selected student lesson sessions?</div>
       <div class="meta" style="margin-top:8px;">
-        <button class="copy create-student-calendar-btn plan-primary-btn">Choose Student + Create Calendar Tasks</button>
+        <button class="copy create-student-calendar-btn plan-primary-btn">${preselectedPlans.length ? 'Create Calendar Tasks for Selected Students' : 'Choose Student + Create Calendar Tasks'}</button>
       </div>
     </div>
   `;
@@ -383,23 +405,32 @@ function showStudentCalendarActions(result) {
 
   const createBtn = actionEl.querySelector('.create-student-calendar-btn');
   createBtn?.addEventListener('click', async () => {
-    const selectedStudent = await showStudentButtonSelector(availableStudents, 'Choose the student to schedule');
-    if (!selectedStudent) return;
+    let targetPlans = [];
 
-    let selectedPlan = lessonPlans.find((p) => p.student === selectedStudent);
-    if (!selectedPlan) {
-      try {
-        selectedPlan = await fetchLessonPlanForStudent(selectedStudent);
-      } catch (err) {
-        addLocalMessage('Could not load lesson plan for that student: ' + err.message, 'bot');
-        return;
+    if (preselectedPlans.length) {
+      targetPlans = preselectedPlans;
+    } else {
+      const selectedStudent = await showStudentButtonSelector(availableStudents, 'Choose the student to schedule');
+      if (!selectedStudent) return;
+
+      let selectedPlan = lessonPlans.find((p) => p.student === selectedStudent);
+      if (!selectedPlan) {
+        try {
+          selectedPlan = await fetchLessonPlanForStudent(selectedStudent);
+        } catch (err) {
+          addLocalMessage('Could not load lesson plan for that student: ' + err.message, 'bot');
+          return;
+        }
       }
+      if (!selectedPlan) return;
+      targetPlans = [selectedPlan];
     }
-    if (!selectedPlan) return;
 
     const today = new Date().toISOString().slice(0, 10);
     const startDateRaw = prompt(
-      `Start date for ${selectedPlan.student}'s lesson sequence (YYYY-MM-DD):`,
+      targetPlans.length === 1
+        ? `Start date for ${targetPlans[0].student}'s lesson sequence (YYYY-MM-DD):`
+        : 'Start date for selected student lesson sequences (YYYY-MM-DD):',
       today
     );
     if (startDateRaw === null) return;
@@ -417,25 +448,40 @@ function showStudentCalendarActions(result) {
       return;
     }
 
-    const plan = buildCalendarPlanFromStudentLesson(selectedPlan, startDate, cadenceDays);
-    if (!plan.milestones.length) {
-      addLocalMessage(`No lesson sessions found for ${selectedPlan.student}.`, 'bot');
-      return;
-    }
-
     setFetching(true);
     try {
-      const resp = await fetch(getApiUrl(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tool: 'create_tasks', input: { plan } })
-      });
-      const { data: taskData, text: taskText } = await parseJsonSafe(resp);
-      if (resp.ok && taskData?.result) {
-        addLocalMessage(taskData.result, 'bot');
-        showIcsExportButton(`Ready to export ${selectedPlan.student}'s lesson sessions as .ics files?`, plan.milestones);
-      } else {
-        addLocalMessage('Failed to create student lesson tasks: ' + (taskData?.error || taskText || JSON.stringify(taskData)), 'bot');
+      const allMilestones = [];
+      let successCount = 0;
+
+      for (const planTarget of targetPlans) {
+        const plan = buildCalendarPlanFromStudentLesson(planTarget, startDate, cadenceDays);
+        if (!plan.milestones.length) {
+          addLocalMessage(`No lesson sessions found for ${planTarget.student}.`, 'bot');
+          continue;
+        }
+
+        const resp = await fetch(getApiUrl(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tool: 'create_tasks', input: { plan } })
+        });
+        const { data: taskData, text: taskText } = await parseJsonSafe(resp);
+        if (resp.ok && taskData?.result) {
+          successCount += 1;
+          allMilestones.push(...plan.milestones);
+          addLocalMessage(taskData.result, 'bot');
+        } else {
+          addLocalMessage(`Failed to create student lesson tasks for ${planTarget.student}: ` + (taskData?.error || taskText || JSON.stringify(taskData)), 'bot');
+        }
+      }
+
+      if (successCount > 0) {
+        showIcsExportButton(
+          successCount === 1
+            ? "Ready to export this student's lesson sessions as .ics files?"
+            : 'Ready to export these student lesson sessions as .ics files?',
+          allMilestones
+        );
       }
     } catch (err) {
       addLocalMessage('Network error while creating student lesson tasks: ' + err.message, 'bot');
@@ -446,6 +492,23 @@ function showStudentCalendarActions(result) {
 }
 
 async function startMvpStudentPlanningFlow() {
+  const projectGoal = prompt('Describe the project goal for these students (used to personalize lesson plans):');
+  if (projectGoal === null || !projectGoal.trim()) {
+    addLocalMessage('MVP planning cancelled (project goal is required).', 'bot');
+    return;
+  }
+
+  const deadlineInput = prompt('Optional: target date for the project (YYYY-MM-DD). Leave blank to skip.', '');
+  if (deadlineInput === null) {
+    addLocalMessage('MVP planning cancelled.', 'bot');
+    return;
+  }
+  const deadline = String(deadlineInput || '').trim();
+  if (deadline && !/^\d{4}-\d{2}-\d{2}$/.test(deadline)) {
+    addLocalMessage('Invalid date format. Use YYYY-MM-DD or leave blank.', 'bot');
+    return;
+  }
+
   // Full MVP branch:
   // 1) Fetch student directory
   // 2) Let user multi-select names in a scrollable chooser
@@ -475,7 +538,10 @@ async function startMvpStudentPlanningFlow() {
 
     const selectedCsv = selectedStudents.join(', ');
     addLocalMessage(`Create personalized lesson plans for ${selectedCsv}`, 'user');
-    await submitPersonalizedLessonPlans(`Create personalized lesson plans for ${selectedCsv}`);
+    await submitPersonalizedLessonPlans(
+      `Create personalized lesson plans for ${selectedCsv}`,
+      { preselectedStudents: selectedStudents, lessonGoal: projectGoal.trim(), deadline }
+    );
   } catch (err) {
     removeTyping();
     addLocalMessage('Unable to start MVP student planning: ' + err.message, 'bot');
