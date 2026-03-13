@@ -29,6 +29,218 @@ app = FastAPI()
 # Each event is a dict: {"title": str, "date": str, "description": str} 
 events: List[Dict] = []
 
+STUDENT_SKILLS_WEBHOOK_URL = os.getenv(
+  "STUDENT_SKILLS_WEBHOOK_URL",
+  "https://myvillageproject.app.n8n.cloud/webhook/student-skills"
+)
+
+
+def _normalize_skill_row(row: dict) -> dict:
+  """Map webhook row variants into a consistent student-skill shape."""
+  if not isinstance(row, dict):
+    return {}
+
+  # Normalize keys to tolerate variants like "first name", "First_Name", etc.
+  keymap = {}
+  for k, v in row.items():
+    norm = re.sub(r"[^a-z0-9]", "", str(k).lower())
+    keymap[norm] = v
+
+  first = str(keymap.get("firstname", "")).strip()
+  last = str(keymap.get("lastname", "")).strip()
+  check_in = str(keymap.get("checkin", "")).strip()
+  skill = str(keymap.get("skill", "")).strip()
+
+  if not first and not last:
+    return {}
+
+  return {
+    "first_name": first,
+    "last_name": last,
+    "check_in": check_in,
+    "skill": skill,
+  }
+
+
+def _extract_rows_from_webhook_payload(payload):
+  """Extract candidate row dicts from common webhook response shapes."""
+  if isinstance(payload, list):
+    return [r for r in payload if isinstance(r, dict)]
+
+  if not isinstance(payload, dict):
+    return []
+
+  for key in ("rows", "data", "items", "result", "records", "students"):
+    v = payload.get(key)
+    if isinstance(v, list):
+      return [r for r in v if isinstance(r, dict)]
+
+  # Some webhooks return a single row object
+  return [payload]
+
+
+def _build_student_strength_index(rows: List[dict]) -> List[dict]:
+  """Group normalized rows by student and summarize top strengths."""
+  grouped: Dict[str, Dict] = {}
+
+  for raw in rows:
+    row = _normalize_skill_row(raw)
+    if not row:
+      continue
+    full_name = (f"{row['first_name']} {row['last_name']}").strip()
+    if not full_name:
+      continue
+
+    if full_name not in grouped:
+      grouped[full_name] = {
+        "student": full_name,
+        "first_name": row["first_name"],
+        "last_name": row["last_name"],
+        "check_ins": [],
+        "skills": {},
+      }
+
+    if row["check_in"]:
+      grouped[full_name]["check_ins"].append(row["check_in"])
+    if row["skill"]:
+      grouped[full_name]["skills"][row["skill"]] = grouped[full_name]["skills"].get(row["skill"], 0) + 1
+
+  results = []
+  for data in grouped.values():
+    skills_sorted = sorted(data["skills"].items(), key=lambda x: (-x[1], x[0].lower()))
+    top_strengths = [name for name, _ in skills_sorted[:3]]
+    results.append({
+      "student": data["student"],
+      "first_name": data["first_name"],
+      "last_name": data["last_name"],
+      "last_check_in": data["check_ins"][-1] if data["check_ins"] else "",
+      "strengths": top_strengths,
+      "skill_counts": data["skills"],
+    })
+
+  results.sort(key=lambda s: s["student"].lower())
+  return results
+
+
+def _make_lesson_plan_for_student(student: dict, lesson_goal: str = "") -> dict:
+  """Create a lightweight, strengths-based lesson plan for one student."""
+  name = student.get("student", "Student")
+  last_check_in = student.get("last_check_in", "")
+  strengths = student.get("strengths") or []
+  s1 = strengths[0] if len(strengths) > 0 else "participation"
+  s2 = strengths[1] if len(strengths) > 1 else s1
+  s3 = strengths[2] if len(strengths) > 2 else s2
+  goal_text = lesson_goal.strip() if isinstance(lesson_goal, str) else ""
+
+  lesson_focus = goal_text or f"Build confidence using {s1}"
+  sessions = [
+    {
+      "title": "Session 1: Strength-Led Warmup",
+      "objective": f"Leverage {s1} as an entry point and set a quick-win task.",
+      "activities": [
+        f"5-minute check-in and reflection connected to {s1}.",
+        f"Short guided task where {name} demonstrates {s1}.",
+        "Exit ticket: one success and one question.",
+      ],
+    },
+    {
+      "title": "Session 2: Challenge and Collaboration",
+      "objective": f"Combine {s1} with {s2} through a collaborative activity.",
+      "activities": [
+        f"Partner mini-project that requires {s1} and {s2}.",
+        "Teacher conference for feedback and stretch goal.",
+        "Peer feedback round using a simple rubric.",
+      ],
+    },
+    {
+      "title": "Session 3: Independent Application",
+      "objective": f"Apply strengths ({s1}, {s2}, {s3}) to an independent deliverable.",
+      "activities": [
+        "Independent work block with milestone checkpoints.",
+        "Presentation or demo of finished work.",
+        "Reflection: next skill to strengthen.",
+      ],
+    },
+  ]
+
+  return {
+    "student": name,
+    "last_check_in": last_check_in,
+    "focus": lesson_focus,
+    "strengths": strengths,
+    "sessions": sessions,
+  }
+
+
+@mcp.tool()
+def personalized_lesson_plans(students: str = "", lesson_goal: str = "", max_students: int = 10) -> dict:
+  """Build personalized lesson plans from webhook student skill rows."""
+  try:
+    max_n = max(1, min(int(max_students), 50))
+  except Exception:
+    max_n = 10
+
+  try:
+    resp = httpx.get(STUDENT_SKILLS_WEBHOOK_URL, timeout=15.0)
+    if resp.status_code != 200:
+      return {
+        "error": f"Failed to fetch student skills (status {resp.status_code}).",
+        "webhook_url": STUDENT_SKILLS_WEBHOOK_URL,
+      }
+    payload = resp.json()
+  except Exception as e:
+    return {
+      "error": f"Unable to fetch student skills: {e}",
+      "webhook_url": STUDENT_SKILLS_WEBHOOK_URL,
+    }
+
+  rows = _extract_rows_from_webhook_payload(payload)
+  students_index = _build_student_strength_index(rows)
+  if not students_index:
+    return {
+      "error": "No valid student rows were found in the webhook response.",
+      "webhook_url": STUDENT_SKILLS_WEBHOOK_URL,
+    }
+
+  # Optional name filtering from comma-separated input, e.g. "Ava Smith, Noah"
+  requested_names = []
+  if isinstance(students, str) and students.strip():
+    requested_names = [n.strip().lower() for n in students.split(",") if n.strip()]
+
+  filtered = students_index
+  if requested_names:
+    filtered = [
+      s for s in students_index
+      if any(name in s["student"].lower() for name in requested_names)
+    ]
+
+  selected = filtered[:max_n]
+  lesson_plans = [_make_lesson_plan_for_student(s, lesson_goal=lesson_goal) for s in selected]
+  available_students = [s.get("student", "") for s in students_index if s.get("student")]
+  selected_students = [s.get("student", "") for s in selected if s.get("student")]
+
+  summary_lines = [
+    f"Personalized lesson plans generated for {len(lesson_plans)} student(s).",
+    f"Source: {STUDENT_SKILLS_WEBHOOK_URL}",
+  ]
+  for plan in lesson_plans:
+    strengths = ", ".join(plan.get("strengths") or ["(no skills reported)"])
+    summary_lines.append("")
+    summary_lines.append(f"{plan['student']} | strengths: {strengths}")
+    for idx, sess in enumerate(plan.get("sessions", []), start=1):
+      summary_lines.append(f"  {idx}. {sess['title']} - {sess['objective']}")
+
+  return {
+    "webhook_url": STUDENT_SKILLS_WEBHOOK_URL,
+    "requested_students": students,
+    "lesson_goal": lesson_goal,
+    "available_students": available_students,
+    "selected_students": selected_students,
+    "count": len(lesson_plans),
+    "lesson_plans": lesson_plans,
+    "summary": "\n".join(summary_lines),
+  }
+
 # Add an event 
 @mcp.tool() 
 
@@ -432,6 +644,27 @@ def handle_message(message: str) -> str:
     "plan", "project", "goal", "accomplish", "breakdown",
     "build", "develop", "launch", "ship", "roadmap", "milestone"
   )
+  student_plan_keywords = (
+    "lesson plan", "lesson plans", "student plan", "student plans",
+    "student skills", "students", "strengths", "personalized lesson"
+  )
+  if any(k in low for k in student_plan_keywords):
+    names = ""
+    # Optional pattern: "for Alice Smith, Bob Lee"
+    m_names = re.search(r"\bfor\s+(.+)$", msg, re.I)
+    if m_names:
+      names = m_names.group(1).strip()
+      # Remove obvious trailing punctuation.
+      names = re.sub(r"[\.!?]+$", "", names)
+
+    plan_data = personalized_lesson_plans(students=names)
+    if isinstance(plan_data, dict):
+      if plan_data.get("summary"):
+        return plan_data["summary"]
+      if plan_data.get("error"):
+        return f"Could not generate personalized lesson plans: {plan_data['error']}"
+    return str(plan_data)
+
   if any(k in low for k in planning_keywords):
     return "What would you like to accomplish? (Describe your goal and I'll help you plan it out.)"
 
