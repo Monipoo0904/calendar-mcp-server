@@ -144,6 +144,21 @@ function parseToolObject(result) {
   }
 }
 
+/*
+Student planning flow notes (frontend)
+- Entry points:
+  1) User sends student-oriented text in the composer (intent routed to submitPersonalizedLessonPlans).
+  2) User clicks Start Planning -> chooses MVP flow via confirm() -> startMvpStudentPlanningFlow.
+- Data contract from backend tool `personalized_lesson_plans`:
+  - available_students: used for the chooser UI.
+  - lesson_plans: includes sessions, strengths, and student name.
+  - summary: readable text for chat output.
+- Important behavior:
+  - parseToolObject() handles MCP payloads that arrive as JSON-encoded strings.
+  - extractRequestedStudentNames() accepts natural language and strips "all students"
+    to avoid accidental over-filtering.
+  - showStudentButtonSelector() supports both single-select and multi-select modes.
+*/
 async function submitPersonalizedLessonPlans(userText) {
   const requestedStudents = extractRequestedStudentNames(userText);
   try {
@@ -305,11 +320,18 @@ async function fetchLessonPlanForStudent(studentName) {
   if (!res.ok || !data?.result) {
     throw new Error(data?.error || rawText || `Failed to fetch lesson plan (${res.status})`);
   }
-  const result = data.result;
+  const result = parseToolObject(data.result);
   const plans = Array.isArray(result?.lesson_plans) ? result.lesson_plans : [];
   return plans[0] || null;
 }
 
+/*
+Calendar conversion notes
+- buildCalendarPlanFromStudentLesson() adapts student session plans to the same
+  `create_tasks` payload shape used by general project planning.
+- This preserves one calendar creation path (`create_tasks`) for both plan types.
+- Session spacing is controlled by cadenceDays and startDate provided by the user.
+*/
 function buildCalendarPlanFromStudentLesson(selectedPlan, startDateStr, cadenceDays) {
   const start = new Date(`${startDateStr}T09:00:00`);
   const strengths = (selectedPlan?.strengths || []).join(', ');
@@ -425,6 +447,11 @@ function showStudentCalendarActions(result) {
 }
 
 async function startMvpStudentPlanningFlow() {
+  // Full MVP branch:
+  // 1) Fetch student directory
+  // 2) Let user multi-select names in a scrollable chooser
+  // 3) Request personalized plans for selected students
+  // 4) Offer per-student calendar task creation actions
   setFetching(true);
   showTyping();
   try {
@@ -1092,5 +1119,13 @@ Project-planning flow developer notes
   - client: public/script.js (submitProjectGoal, interceptGoalPrompt)
   - UI: public/index.html (optional UI elements for project flow)
   - docs: README.md / DEVELOPING.md (update instructions if you change tool names)
+
+MVP student extension notes
+- Unified planning entry: Start Planning branches to MVP or regular project mode.
+- MVP mode uses a scrollable student-button selector with optional multi-select.
+- Student lesson plans are generated via `personalized_lesson_plans` and converted
+  to calendar milestones through `buildCalendarPlanFromStudentLesson`.
+- Calendar persistence still happens through the same `create_tasks` tool to keep
+  reminders/export behavior consistent across planning modes.
 
 */

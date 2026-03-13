@@ -29,6 +29,21 @@ app = FastAPI()
 # Each event is a dict: {"title": str, "date": str, "description": str} 
 events: List[Dict] = []
 
+# Student lesson-planning integration notes
+# - Data source: the webhook below is expected to return student skill rows.
+# - Supported payload shapes:
+#   1) top-level list of row objects
+#   2) object with one of: rows, data, items, result, records, students
+#   3) single row object
+# - Expected row columns (case/spacing tolerant):
+#   row number, first name, last name, check-in, skill
+# - The normalization/index helpers are intentionally tolerant to schema drift
+#   because external automations often rename columns with underscores/spaces.
+# - The UI uses two response fields from `personalized_lesson_plans`:
+#   - available_students: for rendering the student chooser
+#   - lesson_plans: lesson sessions used to build calendar milestones
+# - If webhook access fails, the tool returns an `error` key rather than
+#   raising, so the chat client can show a user-friendly message.
 STUDENT_SKILLS_WEBHOOK_URL = os.getenv(
   "STUDENT_SKILLS_WEBHOOK_URL",
   "https://myvillageproject.app.n8n.cloud/webhook/student-skills"
@@ -36,7 +51,14 @@ STUDENT_SKILLS_WEBHOOK_URL = os.getenv(
 
 
 def _normalize_skill_row(row: dict) -> dict:
-  """Map webhook row variants into a consistent student-skill shape."""
+  """Map webhook row variants into a consistent student-skill shape.
+
+  Output fields are stable and used downstream by the student planner:
+  - first_name
+  - last_name
+  - check_in
+  - skill
+  """
   if not isinstance(row, dict):
     return {}
 
@@ -63,7 +85,11 @@ def _normalize_skill_row(row: dict) -> dict:
 
 
 def _extract_rows_from_webhook_payload(payload):
-  """Extract candidate row dicts from common webhook response shapes."""
+  """Extract candidate row dicts from common webhook response shapes.
+
+  This function keeps the integration resilient when n8n or upstream sheets
+  change the outer envelope of the response.
+  """
   if isinstance(payload, list):
     return [r for r in payload if isinstance(r, dict)]
 
@@ -80,7 +106,11 @@ def _extract_rows_from_webhook_payload(payload):
 
 
 def _build_student_strength_index(rows: List[dict]) -> List[dict]:
-  """Group normalized rows by student and summarize top strengths."""
+  """Group normalized rows by student and summarize top strengths.
+
+  Strength ranking is frequency-based: repeated skills are treated as stronger
+  indicators and surfaced first.
+  """
   grouped: Dict[str, Dict] = {}
 
   for raw in rows:
@@ -123,7 +153,11 @@ def _build_student_strength_index(rows: List[dict]) -> List[dict]:
 
 
 def _make_lesson_plan_for_student(student: dict, lesson_goal: str = "") -> dict:
-  """Create a lightweight, strengths-based lesson plan for one student."""
+  """Create a lightweight, strengths-based lesson plan for one student.
+
+  The resulting `sessions` array is intentionally compatible with the client
+  helper that transforms sessions into calendar milestones.
+  """
   name = student.get("student", "Student")
   last_check_in = student.get("last_check_in", "")
   strengths = student.get("strengths") or []
@@ -174,7 +208,19 @@ def _make_lesson_plan_for_student(student: dict, lesson_goal: str = "") -> dict:
 
 @mcp.tool()
 def personalized_lesson_plans(students: str = "", lesson_goal: str = "", max_students: int = 10) -> dict:
-  """Build personalized lesson plans from webhook student skill rows."""
+  """Build personalized lesson plans from webhook student skill rows.
+
+  Arguments:
+  - students: comma-separated names or partial names. Empty means all students.
+  - lesson_goal: optional focus string applied to each generated plan.
+  - max_students: cap for response size; bounded server-side for safety.
+
+  Returns:
+  - available_students: full directory for UI selection.
+  - selected_students: names matched by the students filter.
+  - lesson_plans: per-student strengths-based sessions.
+  - summary: human-readable text for direct chat display.
+  """
   try:
     max_n = max(1, min(int(max_students), 50))
   except Exception:
