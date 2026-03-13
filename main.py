@@ -206,8 +206,119 @@ def _make_lesson_plan_for_student(student: dict, lesson_goal: str = "") -> dict:
   }
 
 
+def _infer_needed_strength_terms(goal_text: str) -> List[str]:
+  """Infer likely needed strengths from project-goal keywords."""
+  text = (goal_text or "").lower()
+  if not text:
+    return []
+
+  keyword_to_strengths = {
+    "presentation": ["public speaking", "communication"],
+    "pitch": ["public speaking", "communication"],
+    "video": ["editing", "storytelling", "creativity"],
+    "design": ["design", "creativity"],
+    "prototype": ["problem solving", "engineering", "design"],
+    "code": ["coding", "programming", "logic"],
+    "build": ["problem solving", "collaboration"],
+    "research": ["research", "analysis", "writing"],
+    "essay": ["writing", "analysis"],
+    "campaign": ["communication", "leadership", "design"],
+    "event": ["planning", "organization", "leadership"],
+    "budget": ["math", "analysis", "organization"],
+    "team": ["collaboration", "leadership", "communication"],
+    "science": ["analysis", "research", "problem solving"],
+    "math": ["math", "logic", "analysis"],
+    "robot": ["engineering", "coding", "problem solving"],
+  }
+
+  inferred = []
+  for keyword, strengths in keyword_to_strengths.items():
+    if keyword in text:
+      inferred.extend(strengths)
+
+  # Keep insertion order while de-duping.
+  deduped = []
+  seen = set()
+  for item in inferred:
+    if item not in seen:
+      seen.add(item)
+      deduped.append(item)
+  return deduped
+
+
+def _normalize_skill_terms(skill_counts: dict) -> List[str]:
+  """Normalize skill labels for lightweight term matching."""
+  if not isinstance(skill_counts, dict):
+    return []
+  terms = []
+  for skill in skill_counts.keys():
+    s = str(skill or "").strip().lower()
+    if s:
+      terms.append(s)
+  return terms
+
+
+def _compute_additional_student_recommendations(
+  students_index: List[dict],
+  selected_students: List[dict],
+  goal_text: str,
+  deadline: str = "",
+) -> List[dict]:
+  """Suggest students who cover strengths not currently represented by selection."""
+  needed_terms = _infer_needed_strength_terms(goal_text)
+  if not needed_terms:
+    return []
+
+  selected_names = {s.get("student", "") for s in selected_students}
+  covered = set()
+  for s in selected_students:
+    for term in _normalize_skill_terms(s.get("skill_counts", {})):
+      for needed in needed_terms:
+        if needed in term or term in needed:
+          covered.add(needed)
+
+  missing_terms = [t for t in needed_terms if t not in covered]
+  if not missing_terms:
+    return []
+
+  # If deadline is close, keep fewer but stronger recommendations.
+  deadline_days = None
+  if isinstance(deadline, str) and deadline.strip():
+    try:
+      deadline_days = (datetime.strptime(deadline.strip(), "%Y-%m-%d") - datetime.now()).days
+    except Exception:
+      deadline_days = None
+
+  candidates = []
+  for candidate in students_index:
+    name = candidate.get("student", "")
+    if not name or name in selected_names:
+      continue
+
+    matched = []
+    skill_terms = _normalize_skill_terms(candidate.get("skill_counts", {}))
+    for needed in missing_terms:
+      if any((needed in skill) or (skill in needed) for skill in skill_terms):
+        matched.append(needed)
+
+    if not matched:
+      continue
+
+    score = len(set(matched))
+    candidates.append({
+      "student": name,
+      "matched_strengths": sorted(set(matched)),
+      "score": score,
+      "reason": f"Can add: {', '.join(sorted(set(matched)))}",
+    })
+
+  candidates.sort(key=lambda c: (-c["score"], c["student"].lower()))
+  limit = 2 if deadline_days is not None and deadline_days <= 14 else 4
+  return candidates[:limit]
+
+
 @mcp.tool()
-def personalized_lesson_plans(students: str = "", lesson_goal: str = "", max_students: int = 10) -> dict:
+def personalized_lesson_plans(students: str = "", lesson_goal: str = "", max_students: int = 10, deadline: str = "") -> dict:
   """Build personalized lesson plans from webhook student skill rows.
 
   Arguments:
@@ -264,6 +375,12 @@ def personalized_lesson_plans(students: str = "", lesson_goal: str = "", max_stu
   lesson_plans = [_make_lesson_plan_for_student(s, lesson_goal=lesson_goal) for s in selected]
   available_students = [s.get("student", "") for s in students_index if s.get("student")]
   selected_students = [s.get("student", "") for s in selected if s.get("student")]
+  recommended_additional_students = _compute_additional_student_recommendations(
+    students_index=students_index,
+    selected_students=selected,
+    goal_text=lesson_goal,
+    deadline=deadline,
+  )
 
   summary_lines = [
     f"Personalized lesson plans generated for {len(lesson_plans)} student(s).",
@@ -276,12 +393,20 @@ def personalized_lesson_plans(students: str = "", lesson_goal: str = "", max_stu
     for idx, sess in enumerate(plan.get("sessions", []), start=1):
       summary_lines.append(f"  {idx}. {sess['title']} - {sess['objective']}")
 
+  if recommended_additional_students:
+    summary_lines.append("")
+    summary_lines.append("Suggested additional students for missing strengths:")
+    for r in recommended_additional_students:
+      summary_lines.append(f"- {r['student']} ({', '.join(r['matched_strengths'])})")
+
   return {
     "webhook_url": STUDENT_SKILLS_WEBHOOK_URL,
     "requested_students": students,
     "lesson_goal": lesson_goal,
     "available_students": available_students,
     "selected_students": selected_students,
+    "recommended_additional_students": recommended_additional_students,
+    "deadline": deadline,
     "count": len(lesson_plans),
     "lesson_plans": lesson_plans,
     "summary": "\n".join(summary_lines),
