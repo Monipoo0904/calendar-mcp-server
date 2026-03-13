@@ -367,13 +367,12 @@ function showStudentCalendarActions(result) {
   const availableStudents = Array.isArray(result?.available_students) ? result.available_students : lessonPlans.map((p) => p.student).filter(Boolean);
   if (!availableStudents.length) return;
 
-  const studentsText = availableStudents.join(', ');
   const actionEl = document.createElement('div');
   actionEl.className = 'message bot';
   actionEl.innerHTML = `
     <div class="avatar">⭐</div>
     <div class="bubble">
-      <div class="text">Choose a student and add their personalized lesson sessions to the calendar.\nStudents: ${escapeHtml(studentsText)}</div>
+      <div class="text">Ready to schedule selected student lesson sessions?</div>
       <div class="meta" style="margin-top:8px;">
         <button class="copy create-student-calendar-btn plan-primary-btn">Choose Student + Create Calendar Tasks</button>
       </div>
@@ -675,7 +674,10 @@ loadTheme();
 messages.addEventListener('click', (e) => {
   const btn = e.target.closest('.copy');
   if (!btn) return;
+  // Student selector buttons use .copy for visual style only; they should not trigger clipboard behavior.
+  if (btn.classList.contains('student-name-btn')) return;
   const bubble = btn.closest('.bubble');
+  if (!bubble) return;
   const text = bubble.querySelector('.text').textContent;
   navigator.clipboard?.writeText(text).then(() => {
     btn.textContent = 'Copied';
