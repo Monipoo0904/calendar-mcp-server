@@ -69,7 +69,31 @@ function exportCalendarIcs() {
   document.body.removeChild(a);
 }
 
-function showIcsExportButton(message = 'Ready to export your calendar file?') {
+async function exportMilestonesIndividually(milestones) {
+  if (!milestones || !milestones.length) {
+    exportCalendarIcs();
+    return;
+  }
+  const origin = window.location.origin;
+  const base = (!origin || origin === 'null') ? '' : origin;
+  for (let i = 0; i < milestones.length; i++) {
+    const m = milestones[i];
+    const title = m.title || `Milestone ${i + 1}`;
+    const url = `${base}/export-single.ics?title=${encodeURIComponent(title)}`;
+    const a = document.createElement('a');
+    a.href = url;
+    const safeName = title.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase().slice(0, 40);
+    a.download = `milestone_${i + 1}_${safeName}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    if (i < milestones.length - 1) {
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+}
+
+function showIcsExportButton(message = 'Ready to export your calendar file?', milestones = null) {
   const actionEl = document.createElement('div');
   actionEl.className = 'message bot';
   actionEl.innerHTML = `
@@ -85,10 +109,15 @@ function showIcsExportButton(message = 'Ready to export your calendar file?') {
   messages.scrollTop = messages.scrollHeight;
 
   const exportBtn = actionEl.querySelector('.export-ics-btn');
-  exportBtn?.addEventListener('click', () => {
+  exportBtn?.addEventListener('click', async () => {
     logPlanClient('INFO', 'Inline .ics export requested');
-    exportCalendarIcs();
-    addLocalMessage('Downloading .ics export now.', 'bot');
+    if (milestones && milestones.length) {
+      await exportMilestonesIndividually(milestones);
+      addLocalMessage(`Downloading ${milestones.length} calendar invite(s) — one per milestone.`, 'bot');
+    } else {
+      exportCalendarIcs();
+      addLocalMessage('Downloading .ics export now.', 'bot');
+    }
   });
 }
 
@@ -628,15 +657,15 @@ async function submitProjectGoal(goalText) {
               }
 
               if (exportWhere === 'ics' && exportWhen !== 'after review') {
-                logPlanClient('INFO', 'Confirmed .ics export requested');
-                exportCalendarIcs();
-                addLocalMessage('Confirmed. Downloading .ics export now.', 'bot');
+                logPlanClient('INFO', 'Confirmed .ics export requested — individual milestones');
+                await exportMilestonesIndividually(plan.milestones);
+                addLocalMessage(`Confirmed. Downloading ${plan.milestones.length} calendar invite(s) — one per milestone.`, 'bot');
               } else if (exportWhere === 'ics' && exportWhen === 'after review') {
                 addLocalMessage('Review complete. Use the button below when you are ready to export.', 'bot');
-                showIcsExportButton('Export milestones to .ics when ready.');
+                showIcsExportButton('Export milestones to .ics when ready.', plan.milestones);
               } else {
                 addLocalMessage(`Confirmed. Export target '${exportWhere}' selected. (Current automated file export supports .ics download.)`, 'bot');
-                showIcsExportButton('If needed, you can still export these milestones as .ics.');
+                showIcsExportButton('If needed, you can still export these milestones as .ics.', plan.milestones);
               }
             } else {
               logPlanClient('ERROR', 'create_tasks failed', { taskData, taskText, status: resp.status });

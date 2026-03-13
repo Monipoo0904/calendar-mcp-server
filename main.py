@@ -608,6 +608,73 @@ async def export_ics():
   return Response(content=content, media_type="text/calendar; charset=utf-8", headers=headers)
 
 
+@app.get("/export-single.ics", include_in_schema=False)
+async def export_single_ics(request: Request):
+  """Export a single event/milestone as its own ICS file, looked up by title (case-insensitive)."""
+  import uuid
+  import datetime as _dt
+
+  title_param = request.query_params.get("title", "").strip()
+  if not title_param:
+    return JSONResponse(status_code=400, content={"detail": "title query parameter required"})
+
+  ev = next((e for e in events if e.get("title", "").lower() == title_param.lower()), None)
+  if not ev:
+    return JSONResponse(status_code=404, content={"detail": "Event not found"})
+
+  uid = str(uuid.uuid4())
+  now = _dt.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+  desc = ev.get("description", "") or ""
+  title = ev.get("title", "")
+  if ev.get("milestone"):
+    title = f"[Milestone] {title}" if title else "[Milestone]"
+
+  lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Event Calendar MCP//EN",
+  ]
+
+  if "T" in ev.get("date", ""):
+    try:
+      d = _dt.datetime.strptime(ev["date"], "%Y-%m-%dT%H:%M")
+      dtstr = d.strftime("%Y%m%dT%H%M%S")
+      vevent = [
+        "BEGIN:VEVENT",
+        f"UID:{uid}",
+        f"DTSTAMP:{now}",
+        f"DTSTART:{dtstr}",
+      ]
+      if ev.get("end"):
+        try:
+          ed = _dt.datetime.strptime(ev["end"], "%Y-%m-%dT%H:%M")
+          vevent.append(f"DTEND:{ed.strftime('%Y%m%dT%H%M%S')}")
+        except Exception:
+          pass
+      vevent.extend([f"SUMMARY:{title}", f"DESCRIPTION:{desc}", "END:VEVENT"])
+      lines.extend(vevent)
+    except Exception:
+      dtstart = ev["date"].split("T", 1)[0].replace("-", "")
+      lines.extend([
+        "BEGIN:VEVENT", f"UID:{uid}", f"DTSTAMP:{now}",
+        f"DTSTART;VALUE=DATE:{dtstart}", f"SUMMARY:{title}",
+        f"DESCRIPTION:{desc}", "END:VEVENT",
+      ])
+  else:
+    dtstart = ev["date"].replace("-", "")
+    lines.extend([
+      "BEGIN:VEVENT", f"UID:{uid}", f"DTSTAMP:{now}",
+      f"DTSTART;VALUE=DATE:{dtstart}", f"SUMMARY:{title}",
+      f"DESCRIPTION:{desc}", "END:VEVENT",
+    ])
+
+  lines.append("END:VCALENDAR")
+  content = "\r\n".join(lines) + "\r\n"
+  safe_title = re.sub(r"[^a-zA-Z0-9_-]", "_", title)[:40]
+  headers = {"Content-Disposition": f"attachment; filename={safe_title}.ics"}
+  return Response(content=content, media_type="text/calendar; charset=utf-8", headers=headers)
+
+
 if __name__ == "__main__":
   mcp.run()
 
