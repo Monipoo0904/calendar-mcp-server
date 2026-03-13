@@ -208,12 +208,16 @@ async function fetchStudentDirectory() {
   return result;
 }
 
-function showStudentButtonSelector(students, title = 'Select a student') {
+function showStudentButtonSelector(students, title = 'Select a student', options = {}) {
   return new Promise((resolve) => {
     if (!Array.isArray(students) || !students.length) {
       resolve(null);
       return;
     }
+
+    const multiSelect = Boolean(options?.multiSelect);
+    const confirmLabel = options?.confirmLabel || (multiSelect ? 'Use Selected Students' : 'Use Selected Student');
+    const selectedNames = new Set();
 
     const pickerEl = document.createElement('div');
     pickerEl.className = 'message bot';
@@ -226,6 +230,7 @@ function showStudentButtonSelector(students, title = 'Select a student') {
             ${students.map((name) => `<button class="copy student-name-btn" data-name="${escapeHtml(name)}" style="text-align:left;">${escapeHtml(name)}</button>`).join('')}
           </div>
           <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="copy confirm-student-btn plan-primary-btn">${escapeHtml(confirmLabel)}</button>
             <button class="copy cancel-student-btn">Cancel</button>
           </div>
         </div>
@@ -235,13 +240,45 @@ function showStudentButtonSelector(students, title = 'Select a student') {
     messages.scrollTop = messages.scrollHeight;
 
     const cancelBtn = pickerEl.querySelector('.cancel-student-btn');
+    const confirmBtn = pickerEl.querySelector('.confirm-student-btn');
 
     pickerEl.querySelectorAll('.student-name-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const selectedName = btn.getAttribute('data-name') || btn.textContent || '';
-        pickerEl.remove();
-        resolve(selectedName.trim() || null);
+        const normalized = selectedName.trim();
+        if (!normalized) return;
+
+        if (!multiSelect) {
+          pickerEl.remove();
+          resolve(normalized);
+          return;
+        }
+
+        if (selectedNames.has(normalized)) {
+          selectedNames.delete(normalized);
+          btn.style.background = '';
+          btn.style.borderColor = '';
+        } else {
+          selectedNames.add(normalized);
+          btn.style.background = 'rgba(34, 197, 94, 0.18)';
+          btn.style.borderColor = 'rgba(34, 197, 94, 0.8)';
+        }
       });
+    });
+
+    confirmBtn?.addEventListener('click', () => {
+      if (!multiSelect) {
+        resolve(null);
+        pickerEl.remove();
+        return;
+      }
+      const picked = Array.from(selectedNames);
+      if (!picked.length) {
+        addLocalMessage('Select at least one student before continuing.', 'bot');
+        return;
+      }
+      pickerEl.remove();
+      resolve(picked);
     });
 
     cancelBtn?.addEventListener('click', () => {
@@ -400,17 +437,19 @@ async function startMvpStudentPlanningFlow() {
       return;
     }
 
-    const selectedStudent = await showStudentButtonSelector(
+    const selectedStudents = await showStudentButtonSelector(
       studentNames,
-      'MVP student planning: select a student to generate a lesson plan'
+      'MVP student planning: select one or more students to generate lesson plans',
+      { multiSelect: true, confirmLabel: 'Generate Plans for Selected Students' }
     );
-    if (!selectedStudent) {
+    if (!selectedStudents || !selectedStudents.length) {
       addLocalMessage('Student selection cancelled.', 'bot');
       return;
     }
 
-    addLocalMessage(`Create personalized lesson plans for ${selectedStudent}`, 'user');
-    await submitPersonalizedLessonPlans(`Create personalized lesson plans for ${selectedStudent}`);
+    const selectedCsv = selectedStudents.join(', ');
+    addLocalMessage(`Create personalized lesson plans for ${selectedCsv}`, 'user');
+    await submitPersonalizedLessonPlans(`Create personalized lesson plans for ${selectedCsv}`);
   } catch (err) {
     removeTyping();
     addLocalMessage('Unable to start MVP student planning: ' + err.message, 'bot');
