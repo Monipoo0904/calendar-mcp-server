@@ -121,6 +121,175 @@ function showIcsExportButton(message = 'Ready to export your calendar file?', mi
   });
 }
 
+function looksLikeStudentPlanRequest(text) {
+  return /lesson\s*plans?|student\s*plans?|student\s*skills?|strengths?|personalized\s*lesson/i.test(text || '');
+}
+
+function extractRequestedStudentNames(text) {
+  const m = String(text || '').match(/\bfor\s+(.+)$/i);
+  if (!m) return '';
+  return m[1].trim().replace(/[.!?]+$/, '');
+}
+
+async function submitPersonalizedLessonPlans(userText) {
+  const requestedStudents = extractRequestedStudentNames(userText);
+  try {
+    const res = await fetch(getApiUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tool: 'personalized_lesson_plans',
+        input: {
+          students: requestedStudents,
+          lesson_goal: '',
+          max_students: 12,
+        }
+      })
+    });
+    const { data, text: rawText } = await parseJsonSafe(res);
+    if (res.ok && data?.result) {
+      const result = data.result;
+      if (typeof result === 'string') {
+        addLocalMessage(result, 'bot');
+        return;
+      }
+      if (result?.summary) {
+        addLocalMessage(result.summary, 'bot');
+        showStudentCalendarActions(result);
+        return;
+      }
+      addLocalMessage('Personalized lesson plans generated, but the response format was unexpected.', 'bot');
+      return;
+    }
+    addLocalMessage(`Error (${res.status}): ` + (data?.error || rawText || JSON.stringify(data)), 'bot');
+  } catch (err) {
+    addLocalMessage('Network error: ' + err.message, 'bot');
+  }
+}
+
+function chooseStudentPlan(lessonPlans) {
+  if (!Array.isArray(lessonPlans) || !lessonPlans.length) {
+    return null;
+  }
+  if (lessonPlans.length === 1) {
+    return lessonPlans[0];
+  }
+
+  const options = lessonPlans.map((p, i) => `${i + 1}. ${p.student}`).join('\n');
+  const answer = prompt(
+    `Choose a student to schedule in the calendar:\n\n${options}\n\nType a number (e.g., 1).`
+  );
+  if (answer === null) return null;
+  const selected = parseInt(String(answer).trim(), 10);
+  if (!Number.isInteger(selected) || selected < 1 || selected > lessonPlans.length) {
+    addLocalMessage('Invalid selection. Please try again and enter a valid student number.', 'bot');
+    return null;
+  }
+  return lessonPlans[selected - 1];
+}
+
+function buildCalendarPlanFromStudentLesson(selectedPlan, startDateStr, cadenceDays) {
+  const start = new Date(`${startDateStr}T09:00:00`);
+  const strengths = (selectedPlan?.strengths || []).join(', ');
+  const sessions = Array.isArray(selectedPlan?.sessions) ? selectedPlan.sessions : [];
+
+  const milestones = sessions.map((session, index) => {
+    const dueDate = new Date(start);
+    dueDate.setDate(start.getDate() + (index * cadenceDays));
+    const due = dueDate.toISOString().slice(0, 10);
+    const activities = Array.isArray(session?.activities) ? session.activities : [];
+    const objective = session?.objective ? String(session.objective).trim() : '';
+    const descriptionParts = [];
+    if (objective) descriptionParts.push(`Objective: ${objective}`);
+    if (strengths) descriptionParts.push(`Strengths: ${strengths}`);
+
+    return {
+      title: `${selectedPlan.student} - ${session?.title || `Session ${index + 1}`}`,
+      due,
+      description: descriptionParts.join('\n'),
+      steps: activities,
+    };
+  });
+
+  return {
+    goal: `Personalized lesson plan for ${selectedPlan?.student || 'student'}`,
+    deadline: milestones.length ? milestones[milestones.length - 1].due : startDateStr,
+    milestones,
+  };
+}
+
+function showStudentCalendarActions(result) {
+  const lessonPlans = Array.isArray(result?.lesson_plans) ? result.lesson_plans : [];
+  if (!lessonPlans.length) return;
+
+  const studentsText = lessonPlans.map((p) => p.student).join(', ');
+  const actionEl = document.createElement('div');
+  actionEl.className = 'message bot';
+  actionEl.innerHTML = `
+    <div class="avatar">⭐</div>
+    <div class="bubble">
+      <div class="text">Choose a student and add their personalized lesson sessions to the calendar.\nStudents: ${escapeHtml(studentsText)}</div>
+      <div class="meta" style="margin-top:8px;">
+        <button class="copy create-student-calendar-btn plan-primary-btn">Choose Student + Create Calendar Tasks</button>
+      </div>
+    </div>
+  `;
+  messages.appendChild(actionEl);
+  messages.scrollTop = messages.scrollHeight;
+
+  const createBtn = actionEl.querySelector('.create-student-calendar-btn');
+  createBtn?.addEventListener('click', async () => {
+    const selectedPlan = chooseStudentPlan(lessonPlans);
+    if (!selectedPlan) return;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const startDateRaw = prompt(
+      `Start date for ${selectedPlan.student}'s lesson sequence (YYYY-MM-DD):`,
+      today
+    );
+    if (startDateRaw === null) return;
+    const startDate = String(startDateRaw).trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+      addLocalMessage('Invalid date format. Use YYYY-MM-DD.', 'bot');
+      return;
+    }
+
+    const cadenceRaw = prompt('Spacing between sessions in days (default 7):', '7');
+    if (cadenceRaw === null) return;
+    const cadenceDays = parseInt(String(cadenceRaw).trim() || '7', 10);
+    if (!Number.isInteger(cadenceDays) || cadenceDays < 1 || cadenceDays > 30) {
+      addLocalMessage('Invalid cadence. Enter a whole number between 1 and 30.', 'bot');
+      return;
+    }
+
+    const plan = buildCalendarPlanFromStudentLesson(selectedPlan, startDate, cadenceDays);
+    if (!plan.milestones.length) {
+      addLocalMessage(`No lesson sessions found for ${selectedPlan.student}.`, 'bot');
+      return;
+    }
+
+    setFetching(true);
+    try {
+      const resp = await fetch(getApiUrl(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool: 'create_tasks', input: { plan } })
+      });
+      const { data: taskData, text: taskText } = await parseJsonSafe(resp);
+      if (resp.ok && taskData?.result) {
+        addLocalMessage(taskData.result, 'bot');
+        showIcsExportButton(`Ready to export ${selectedPlan.student}'s lesson sessions as .ics files?`, plan.milestones);
+      } else {
+        addLocalMessage('Failed to create student lesson tasks: ' + (taskData?.error || taskText || JSON.stringify(taskData)), 'bot');
+      }
+    } catch (err) {
+      addLocalMessage('Network error while creating student lesson tasks: ' + err.message, 'bot');
+    } finally {
+      setFetching(false);
+    }
+  });
+}
+
 function save() {
   try {
     localStorage.setItem('chat_messages', JSON.stringify(chat));
@@ -363,6 +532,12 @@ form.addEventListener('submit', async (e) => {
   showTyping();
 
   try {
+    if (looksLikeStudentPlanRequest(text)) {
+      removeTyping();
+      await submitPersonalizedLessonPlans(text);
+      return;
+    }
+
     const res = await fetch(getApiUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -695,12 +870,32 @@ function interceptGoalPrompt(text) {
   if (/what would you like to accomplish\?/i.test(text)) {
     const quick = document.createElement('div');
     quick.className = 'quick-actions';
-    quick.innerHTML = `<p style="margin:4px 0;font-size:0.9em;color:var(--muted);">👇 Click the button below to start planning your project</p><button class="copy" id="startProjectBtn">Start Project</button>`;
+    quick.innerHTML = `
+      <p style="margin:4px 0;font-size:0.9em;color:var(--muted);">👇 Choose a planning shortcut</p>
+      <button class="copy" id="startProjectBtn">Start Project</button>
+      <button class="copy" id="studentPlansBtn">Student Lesson Plans</button>
+    `;
     messages.appendChild(quick);
     document.getElementById('startProjectBtn').addEventListener('click', () => {
       const goal = prompt('Briefly describe the goal you want to accomplish (one sentence):');
       if (!goal) return;
       submitProjectGoal(goal);
+      quick.remove();
+    });
+    document.getElementById('studentPlansBtn').addEventListener('click', async () => {
+      const names = prompt('Optional: enter student names separated by commas (or leave blank for all).');
+      const q = names && names.trim()
+        ? `Create personalized lesson plans for ${names.trim()}`
+        : 'Create personalized lesson plans for all students';
+      addLocalMessage(q, 'user');
+      setFetching(true);
+      showTyping();
+      try {
+        removeTyping();
+        await submitPersonalizedLessonPlans(q);
+      } finally {
+        setFetching(false);
+      }
       quick.remove();
     });
     messages.scrollTop = messages.scrollHeight;
