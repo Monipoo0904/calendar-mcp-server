@@ -167,25 +167,70 @@ async function submitPersonalizedLessonPlans(userText) {
   }
 }
 
-function chooseStudentPlan(lessonPlans) {
-  if (!Array.isArray(lessonPlans) || !lessonPlans.length) {
-    return null;
-  }
-  if (lessonPlans.length === 1) {
-    return lessonPlans[0];
-  }
+function showScrollableStudentSelector(students) {
+  return new Promise((resolve) => {
+    if (!Array.isArray(students) || !students.length) {
+      resolve(null);
+      return;
+    }
 
-  const options = lessonPlans.map((p, i) => `${i + 1}. ${p.student}`).join('\n');
-  const answer = prompt(
-    `Choose a student to schedule in the calendar:\n\n${options}\n\nType a number (e.g., 1).`
-  );
-  if (answer === null) return null;
-  const selected = parseInt(String(answer).trim(), 10);
-  if (!Number.isInteger(selected) || selected < 1 || selected > lessonPlans.length) {
-    addLocalMessage('Invalid selection. Please try again and enter a valid student number.', 'bot');
-    return null;
+    const pickerEl = document.createElement('div');
+    pickerEl.className = 'message bot';
+    pickerEl.innerHTML = `
+      <div class="avatar">⭐</div>
+      <div class="bubble">
+        <div class="text">Select the student from the list (scroll to find the right name):</div>
+        <div class="meta" style="margin-top:8px; display:block;">
+          <select class="student-scroll-picker" size="8" style="width:100%; max-height:220px; overflow-y:auto; border-radius:8px; padding:8px;">
+            ${students.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}
+          </select>
+          <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="copy confirm-student-btn plan-primary-btn">Use Selected Student</button>
+            <button class="copy cancel-student-btn">Cancel</button>
+          </div>
+        </div>
+      </div>
+    `;
+    messages.appendChild(pickerEl);
+    messages.scrollTop = messages.scrollHeight;
+
+    const selectEl = pickerEl.querySelector('.student-scroll-picker');
+    const confirmBtn = pickerEl.querySelector('.confirm-student-btn');
+    const cancelBtn = pickerEl.querySelector('.cancel-student-btn');
+
+    confirmBtn?.addEventListener('click', () => {
+      const selectedName = selectEl?.value || '';
+      pickerEl.remove();
+      resolve(selectedName || null);
+    });
+
+    cancelBtn?.addEventListener('click', () => {
+      pickerEl.remove();
+      resolve(null);
+    });
+  });
+}
+
+async function fetchLessonPlanForStudent(studentName) {
+  const res = await fetch(getApiUrl(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      tool: 'personalized_lesson_plans',
+      input: {
+        students: studentName,
+        lesson_goal: '',
+        max_students: 1,
+      }
+    })
+  });
+  const { data, text: rawText } = await parseJsonSafe(res);
+  if (!res.ok || !data?.result) {
+    throw new Error(data?.error || rawText || `Failed to fetch lesson plan (${res.status})`);
   }
-  return lessonPlans[selected - 1];
+  const result = data.result;
+  const plans = Array.isArray(result?.lesson_plans) ? result.lesson_plans : [];
+  return plans[0] || null;
 }
 
 function buildCalendarPlanFromStudentLesson(selectedPlan, startDateStr, cadenceDays) {
@@ -220,9 +265,10 @@ function buildCalendarPlanFromStudentLesson(selectedPlan, startDateStr, cadenceD
 
 function showStudentCalendarActions(result) {
   const lessonPlans = Array.isArray(result?.lesson_plans) ? result.lesson_plans : [];
-  if (!lessonPlans.length) return;
+  const availableStudents = Array.isArray(result?.available_students) ? result.available_students : lessonPlans.map((p) => p.student).filter(Boolean);
+  if (!availableStudents.length) return;
 
-  const studentsText = lessonPlans.map((p) => p.student).join(', ');
+  const studentsText = availableStudents.join(', ');
   const actionEl = document.createElement('div');
   actionEl.className = 'message bot';
   actionEl.innerHTML = `
@@ -239,7 +285,18 @@ function showStudentCalendarActions(result) {
 
   const createBtn = actionEl.querySelector('.create-student-calendar-btn');
   createBtn?.addEventListener('click', async () => {
-    const selectedPlan = chooseStudentPlan(lessonPlans);
+    const selectedStudent = await showScrollableStudentSelector(availableStudents);
+    if (!selectedStudent) return;
+
+    let selectedPlan = lessonPlans.find((p) => p.student === selectedStudent);
+    if (!selectedPlan) {
+      try {
+        selectedPlan = await fetchLessonPlanForStudent(selectedStudent);
+      } catch (err) {
+        addLocalMessage('Could not load lesson plan for that student: ' + err.message, 'bot');
+        return;
+      }
+    }
     if (!selectedPlan) return;
 
     const today = new Date().toISOString().slice(0, 10);
