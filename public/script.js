@@ -128,7 +128,20 @@ function looksLikeStudentPlanRequest(text) {
 function extractRequestedStudentNames(text) {
   const m = String(text || '').match(/\bfor\s+(.+)$/i);
   if (!m) return '';
-  return m[1].trim().replace(/[.!?]+$/, '');
+  const raw = m[1].trim().replace(/[.!?]+$/, '');
+  if (/^all\s+students?$/i.test(raw)) return '';
+  return raw;
+}
+
+function parseToolObject(result) {
+  if (typeof result !== 'string') return result;
+  const text = result.trim();
+  if (!text.startsWith('{') || !text.endsWith('}')) return result;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return result;
+  }
 }
 
 async function submitPersonalizedLessonPlans(userText) {
@@ -148,9 +161,13 @@ async function submitPersonalizedLessonPlans(userText) {
     });
     const { data, text: rawText } = await parseJsonSafe(res);
     if (res.ok && data?.result) {
-      const result = data.result;
+      const result = parseToolObject(data.result);
       if (typeof result === 'string') {
         addLocalMessage(result, 'bot');
+        return;
+      }
+      if (result?.error) {
+        addLocalMessage('Unable to generate student lesson plans: ' + result.error, 'bot');
         return;
       }
       if (result?.summary) {
@@ -167,7 +184,31 @@ async function submitPersonalizedLessonPlans(userText) {
   }
 }
 
-function showScrollableStudentSelector(students) {
+async function fetchStudentDirectory() {
+  const res = await fetch(getApiUrl(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      tool: 'personalized_lesson_plans',
+      input: {
+        students: '',
+        lesson_goal: '',
+        max_students: 200,
+      }
+    })
+  });
+  const { data, text: rawText } = await parseJsonSafe(res);
+  if (!res.ok || !data?.result) {
+    throw new Error(data?.error || rawText || `Failed to fetch students (${res.status})`);
+  }
+  const result = parseToolObject(data.result);
+  if (typeof result === 'string') {
+    throw new Error(result);
+  }
+  return result;
+}
+
+function showStudentButtonSelector(students, title = 'Select a student') {
   return new Promise((resolve) => {
     if (!Array.isArray(students) || !students.length) {
       resolve(null);
@@ -179,13 +220,12 @@ function showScrollableStudentSelector(students) {
     pickerEl.innerHTML = `
       <div class="avatar">⭐</div>
       <div class="bubble">
-        <div class="text">Select the student from the list (scroll to find the right name):</div>
+        <div class="text">${escapeHtml(title)} (scroll to find the right name):</div>
         <div class="meta" style="margin-top:8px; display:block;">
-          <select class="student-scroll-picker" size="8" style="width:100%; max-height:220px; overflow-y:auto; border-radius:8px; padding:8px;">
-            ${students.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}
-          </select>
+          <div class="student-button-list" style="max-height:260px; overflow-y:auto; border:1px solid rgba(0,0,0,0.12); border-radius:8px; padding:8px; display:grid; gap:6px;">
+            ${students.map((name) => `<button class="copy student-name-btn" data-name="${escapeHtml(name)}" style="text-align:left;">${escapeHtml(name)}</button>`).join('')}
+          </div>
           <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
-            <button class="copy confirm-student-btn plan-primary-btn">Use Selected Student</button>
             <button class="copy cancel-student-btn">Cancel</button>
           </div>
         </div>
@@ -194,14 +234,14 @@ function showScrollableStudentSelector(students) {
     messages.appendChild(pickerEl);
     messages.scrollTop = messages.scrollHeight;
 
-    const selectEl = pickerEl.querySelector('.student-scroll-picker');
-    const confirmBtn = pickerEl.querySelector('.confirm-student-btn');
     const cancelBtn = pickerEl.querySelector('.cancel-student-btn');
 
-    confirmBtn?.addEventListener('click', () => {
-      const selectedName = selectEl?.value || '';
-      pickerEl.remove();
-      resolve(selectedName || null);
+    pickerEl.querySelectorAll('.student-name-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const selectedName = btn.getAttribute('data-name') || btn.textContent || '';
+        pickerEl.remove();
+        resolve(selectedName.trim() || null);
+      });
     });
 
     cancelBtn?.addEventListener('click', () => {
@@ -285,7 +325,7 @@ function showStudentCalendarActions(result) {
 
   const createBtn = actionEl.querySelector('.create-student-calendar-btn');
   createBtn?.addEventListener('click', async () => {
-    const selectedStudent = await showScrollableStudentSelector(availableStudents);
+    const selectedStudent = await showStudentButtonSelector(availableStudents, 'Choose the student to schedule');
     if (!selectedStudent) return;
 
     let selectedPlan = lessonPlans.find((p) => p.student === selectedStudent);
@@ -345,6 +385,38 @@ function showStudentCalendarActions(result) {
       setFetching(false);
     }
   });
+}
+
+async function startMvpStudentPlanningFlow() {
+  setFetching(true);
+  showTyping();
+  try {
+    const directory = await fetchStudentDirectory();
+    const studentNames = Array.isArray(directory?.available_students) ? directory.available_students : [];
+    removeTyping();
+
+    if (!studentNames.length) {
+      addLocalMessage('No students were returned from the student skills source.', 'bot');
+      return;
+    }
+
+    const selectedStudent = await showStudentButtonSelector(
+      studentNames,
+      'MVP student planning: select a student to generate a lesson plan'
+    );
+    if (!selectedStudent) {
+      addLocalMessage('Student selection cancelled.', 'bot');
+      return;
+    }
+
+    addLocalMessage(`Create personalized lesson plans for ${selectedStudent}`, 'user');
+    await submitPersonalizedLessonPlans(`Create personalized lesson plans for ${selectedStudent}`);
+  } catch (err) {
+    removeTyping();
+    addLocalMessage('Unable to start MVP student planning: ' + err.message, 'bot');
+  } finally {
+    setFetching(false);
+  }
 }
 
 function save() {
@@ -923,32 +995,23 @@ async function submitProjectGoal(goalText) {
 
 // wire quick shortcut: when bot asks "what would you like to accomplish?" show a small quick-prompt UI
 function interceptGoalPrompt(text) {
-  // called after adding a bot message; keep it tiny: show a "Start Project" suggestion that when clicked prompts user
+  // called after adding a bot message; keep it tiny: one planning entrypoint
   if (/what would you like to accomplish\?/i.test(text)) {
     const quick = document.createElement('div');
     quick.className = 'quick-actions';
     quick.innerHTML = `
       <p style="margin:4px 0;font-size:0.9em;color:var(--muted);">👇 Choose a planning shortcut</p>
-      <button class="copy" id="startProjectBtn">Start Project</button>
-      <button class="copy" id="studentPlansBtn">Student Lesson Plans</button>
+      <button class="copy" id="startProjectBtn">Start Planning</button>
     `;
     messages.appendChild(quick);
-    document.getElementById('startProjectBtn').addEventListener('click', () => {
-      const goal = prompt('Briefly describe the goal you want to accomplish (one sentence):');
-      if (!goal) return;
-      submitProjectGoal(goal);
-      quick.remove();
-    });
-    document.getElementById('studentPlansBtn').addEventListener('click', async () => {
-      const q = 'Create personalized lesson plans for all students';
-      addLocalMessage(q, 'user');
-      setFetching(true);
-      showTyping();
-      try {
-        removeTyping();
-        await submitPersonalizedLessonPlans(q);
-      } finally {
-        setFetching(false);
+    document.getElementById('startProjectBtn').addEventListener('click', async () => {
+      const isMvpStudentPlan = confirm('Is this plan for an MVP student?\n\nClick OK for MVP student lesson planning, or Cancel for a regular project plan.');
+      if (isMvpStudentPlan) {
+        await startMvpStudentPlanningFlow();
+      } else {
+        const goal = prompt('Briefly describe the goal you want to accomplish (one sentence):');
+        if (!goal) return;
+        await submitProjectGoal(goal);
       }
       quick.remove();
     });
