@@ -84,6 +84,12 @@ Planning debug notes
 - `create_tasks` requires named input argument `plan`. Client requests must use:
   - `{"tool":"create_tasks","input":{"plan": <plan_object>}}`
 - The plan action area includes an `Export .ics now` button that downloads `.ics` from `/export.ics`.
+- Student planning exports include an `Export by Student` option and an inline export scope label.
+  - Scope options:
+    - all calendar events (default `Export .ics` button)
+    - all selected students (`/export.ics?students=name1,name2`)
+    - one student (`/export.ics?student=name`)
+- Student lesson milestones now include personalized objective text in event descriptions.
 - Browser planning diagnostics are logged with prefix `[plan-client]`.
 - Server handler diagnostics are logged with prefix `[mcp-handler]`.
 - If task creation fails, compare both logs first to confirm payload shape and tool validation path.

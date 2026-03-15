@@ -169,10 +169,18 @@ def _make_lesson_plan_for_student(student: dict, lesson_goal: str = "") -> dict:
   goal_text = lesson_goal.strip() if isinstance(lesson_goal, str) else ""
 
   lesson_focus = goal_text or f"Build confidence using {s1}"
+  student_objective = (
+    f"Use {s1} and {s2} to make measurable progress toward: {lesson_focus}"
+    if goal_text
+    else f"Use {s1} and {s2} to strengthen confidence and independent work habits."
+  )
   sessions = [
     {
       "title": "Session 1: Strength-Led Warmup",
-      "objective": f"Leverage {s1} as an entry point and set a quick-win task.",
+      "objective": (
+        f"Leverage {s1} as an entry point and set a quick-win task"
+        + (f" aligned to {lesson_focus}." if goal_text else ".")
+      ),
       "activities": [
         f"5-minute check-in and reflection connected to {s1}.",
         f"Short guided task where {name} demonstrates {s1}.",
@@ -181,7 +189,10 @@ def _make_lesson_plan_for_student(student: dict, lesson_goal: str = "") -> dict:
     },
     {
       "title": "Session 2: Challenge and Collaboration",
-      "objective": f"Combine {s1} with {s2} through a collaborative activity.",
+      "objective": (
+        f"Combine {s1} with {s2} through a collaborative activity"
+        + (f" that advances {lesson_focus}." if goal_text else ".")
+      ),
       "activities": [
         f"Partner mini-project that requires {s1} and {s2}.",
         "Teacher conference for feedback and stretch goal.",
@@ -190,7 +201,10 @@ def _make_lesson_plan_for_student(student: dict, lesson_goal: str = "") -> dict:
     },
     {
       "title": "Session 3: Independent Application",
-      "objective": f"Apply strengths ({s1}, {s2}, {s3}) to an independent deliverable.",
+      "objective": (
+        f"Apply strengths ({s1}, {s2}, {s3}) to an independent deliverable"
+        + (f" connected to {lesson_focus}." if goal_text else ".")
+      ),
       "activities": [
         "Independent work block with milestone checkpoints.",
         "Presentation or demo of finished work.",
@@ -203,6 +217,7 @@ def _make_lesson_plan_for_student(student: dict, lesson_goal: str = "") -> dict:
     "student": name,
     "last_check_in": last_check_in,
     "focus": lesson_focus,
+    "student_objective": student_objective,
     "strengths": strengths,
     "sessions": sessions,
   }
@@ -1032,7 +1047,7 @@ async def oauth_microsoft_callback(request: Request):
 
 
 @app.get("/export.ics", include_in_schema=False)
-async def export_ics():
+async def export_ics(request: Request):
   """Generate a simple iCalendar (.ics) file from in-memory `events`.
 
   The exporter supports both date-only and timed events. If an event contains a
@@ -1047,6 +1062,26 @@ async def export_ics():
   import uuid
   import datetime as _dt
 
+  requested_student = request.query_params.get("student", "").strip()
+  requested_students_csv = request.query_params.get("students", "").strip()
+  requested_students = [
+    part.strip().lower()
+    for part in requested_students_csv.split(",")
+    if part and part.strip()
+  ]
+  scoped_events = events
+  if requested_students:
+    requested_set = set(requested_students)
+    scoped_events = [
+      e for e in events
+      if str(e.get("student", "")).strip().lower() in requested_set
+    ]
+  elif requested_student:
+    scoped_events = [
+      e for e in events
+      if str(e.get("student", "")).strip().lower() == requested_student.lower()
+    ]
+
   lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -1054,7 +1089,7 @@ async def export_ics():
   ]
 
   now = _dt.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-  for e in sorted(events, key=lambda x: x["date"]):
+  for e in sorted(scoped_events, key=lambda x: x["date"]):
     uid = str(uuid.uuid4())
     # date in format YYYYMMDD for all-day DTSTART
     desc = e.get('description', '') or ''
@@ -1124,7 +1159,14 @@ async def export_ics():
   lines.append("END:VCALENDAR")
   content = "\r\n".join(lines) + "\r\n"
 
-  headers = {"Content-Disposition": "attachment; filename=events.ics"}
+  if requested_students:
+    filename = "selected_students_events.ics"
+  elif requested_student:
+    safe_student = re.sub(r"[^a-zA-Z0-9_-]", "_", requested_student)[:40] or "student"
+    filename = f"{safe_student}_events.ics"
+  else:
+    filename = "events.ics"
+  headers = {"Content-Disposition": f"attachment; filename={filename}"}
   return Response(content=content, media_type="text/calendar; charset=utf-8", headers=headers)
 
 
@@ -1559,10 +1601,16 @@ def create_tasks(plan: dict) -> str:
       skipped += 1
       continue
     steps = m.get("steps") if isinstance(m.get("steps"), list) else []
+    student_name = str(m.get("student") or plan.get("student") or "").strip()
+    student_objective = str(m.get("objective") or plan.get("student_objective") or "").strip()
     checklist = [f"- {str(step).strip()}" for step in steps if isinstance(step, str) and str(step).strip()]
     desc_lines = []
     if goal:
       desc_lines.append(f"Goal: {goal}")
+    if student_name:
+      desc_lines.append(f"Student: {student_name}")
+    if student_objective:
+      desc_lines.append(f"Personalized objective: {student_objective}")
     if m.get("description"):
       desc_lines.append(str(m.get("description")).strip())
     if checklist:
@@ -1575,6 +1623,10 @@ def create_tasks(plan: dict) -> str:
     if len(events) > before_len:
       events[-1]["milestone"] = True
       events[-1]["source"] = "plan_milestone"
+      if student_name:
+        events[-1]["student"] = student_name
+      if student_objective:
+        events[-1]["student_objective"] = student_objective
       created += 1
     else:
       skipped += 1

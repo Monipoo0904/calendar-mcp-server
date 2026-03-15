@@ -194,6 +194,12 @@ body{margin:0;font-family:Inter,Helvetica,Arial,sans-serif;background:var(--bg);
   color:var(--muted);
 }
 
+.export-scope-label{
+  margin-top:8px;
+  font-size:0.82rem;
+  color:var(--muted);
+}
+
 [data-theme="dark"] .plan-secondary-btn{border-color:rgba(255,255,255,0.12)}
 
 /* Keep chat layout stable so messages remain visible on small or tall screens */

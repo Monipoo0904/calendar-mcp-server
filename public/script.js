@@ -110,12 +110,30 @@ function getApiUrl() {
   return `${origin}/api/mcp`;
 }
 
-function exportCalendarIcs() {
+function exportCalendarIcs(options = {}) {
+  const student = String(options?.student || '').trim();
+  const students = Array.isArray(options?.students)
+    ? options.students.map((n) => String(n || '').trim()).filter(Boolean)
+    : [];
   const origin = window.location.origin;
-  const url = (!origin || origin === 'null') ? '/export.ics' : `${origin}/export.ics`;
+  const base = (!origin || origin === 'null') ? '' : origin;
+  let query = '';
+  if (students.length) {
+    query = `?students=${encodeURIComponent(students.join(','))}`;
+  } else if (student) {
+    query = `?student=${encodeURIComponent(student)}`;
+  }
+  const url = `${base}/export.ics${query}`;
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'events.ics';
+  if (students.length > 1) {
+    a.download = 'selected_students_events.ics';
+  } else if (student) {
+    const safeStudent = student.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase().slice(0, 40);
+    a.download = `${safeStudent || 'student'}_events.ics`;
+  } else {
+    a.download = 'events.ics';
+  }
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -145,24 +163,37 @@ async function exportMilestonesIndividually(milestones) {
   }
 }
 
-function showIcsExportButton(message = 'Ready to export your calendar file?', milestones = null) {
+function showIcsExportButton(message = 'Ready to export your calendar file?', milestones = null, options = {}) {
+  const studentNames = Array.isArray(options?.studentNames)
+    ? Array.from(new Set(options.studentNames.map((n) => String(n || '').trim()).filter(Boolean)))
+    : [];
+  const defaultScope = studentNames.length
+    ? `Selected students (${studentNames.length})`
+    : 'All calendar events';
+
   const actionEl = document.createElement('div');
   actionEl.className = 'message bot';
   actionEl.innerHTML = `
     <div class="avatar">⭐</div>
     <div class="bubble">
       <div class="text">${escapeHtml(message)}</div>
+      <div class="export-scope-label">Export scope: ${escapeHtml(defaultScope)}</div>
       <div class="meta" style="margin-top:8px;">
         <button class="copy export-ics-btn plan-primary-btn">Export .ics</button>
+        ${studentNames.length ? '<button class="copy export-student-ics-btn plan-secondary-btn">Export by Student</button>' : ''}
       </div>
     </div>
   `;
   messages.appendChild(actionEl);
   messages.scrollTop = messages.scrollHeight;
 
+  const scopeLabelEl = actionEl.querySelector('.export-scope-label');
   const exportBtn = actionEl.querySelector('.export-ics-btn');
   exportBtn?.addEventListener('click', async () => {
     logPlanClient('INFO', 'Inline .ics export requested');
+    if (scopeLabelEl) {
+      scopeLabelEl.textContent = 'Export scope: All calendar events';
+    }
     if (milestones && milestones.length) {
       await exportMilestonesIndividually(milestones);
       addLocalMessage(`Downloading ${milestones.length} calendar invite(s) — one per milestone.`, 'bot');
@@ -170,6 +201,33 @@ function showIcsExportButton(message = 'Ready to export your calendar file?', mi
       exportCalendarIcs();
       addLocalMessage('Downloading .ics export now.', 'bot');
     }
+  });
+
+  const exportStudentBtn = actionEl.querySelector('.export-student-ics-btn');
+  exportStudentBtn?.addEventListener('click', async () => {
+    if (!studentNames.length) {
+      exportCalendarIcs();
+      return;
+    }
+
+    const choices = ['All selected students', ...studentNames];
+    const picked = await showStudentButtonSelector(choices, 'Choose whose calendar invite to export');
+    if (!picked) return;
+
+    if (picked === 'All selected students') {
+      if (scopeLabelEl) {
+        scopeLabelEl.textContent = `Export scope: Selected students (${studentNames.length})`;
+      }
+      exportCalendarIcs({ students: studentNames });
+      addLocalMessage('Downloading .ics export for all selected students.', 'bot');
+      return;
+    }
+
+    if (scopeLabelEl) {
+      scopeLabelEl.textContent = `Export scope: ${picked}`;
+    }
+    exportCalendarIcs({ student: picked });
+    addLocalMessage(`Downloading ${picked}'s calendar invites as .ics.`, 'bot');
   });
 }
 
@@ -400,6 +458,8 @@ Calendar conversion notes
 */
 function buildCalendarPlanFromStudentLesson(selectedPlan, startDateStr, cadenceDays) {
   const start = new Date(`${startDateStr}T09:00:00`);
+  const studentName = String(selectedPlan?.student || '').trim();
+  const studentObjective = String(selectedPlan?.student_objective || selectedPlan?.focus || '').trim();
   const strengths = (selectedPlan?.strengths || []).join(', ');
   const sessions = Array.isArray(selectedPlan?.sessions) ? selectedPlan.sessions : [];
 
@@ -410,12 +470,15 @@ function buildCalendarPlanFromStudentLesson(selectedPlan, startDateStr, cadenceD
     const activities = Array.isArray(session?.activities) ? session.activities : [];
     const objective = session?.objective ? String(session.objective).trim() : '';
     const descriptionParts = [];
+    if (studentObjective) descriptionParts.push(`Student objective: ${studentObjective}`);
     if (objective) descriptionParts.push(`Objective: ${objective}`);
     if (strengths) descriptionParts.push(`Strengths: ${strengths}`);
 
     return {
       title: `${selectedPlan.student} - ${session?.title || `Session ${index + 1}`}`,
       due,
+      student: studentName,
+      objective: studentObjective,
       description: descriptionParts.join('\n'),
       steps: activities,
     };
@@ -423,6 +486,8 @@ function buildCalendarPlanFromStudentLesson(selectedPlan, startDateStr, cadenceD
 
   return {
     goal: `Personalized lesson plan for ${selectedPlan?.student || 'student'}`,
+    student: studentName,
+    student_objective: studentObjective,
     deadline: milestones.length ? milestones[milestones.length - 1].due : startDateStr,
     milestones,
   };
@@ -528,11 +593,13 @@ function showStudentCalendarActions(result, flowOptions = {}) {
       }
 
       if (successCount > 0) {
+        const exportStudentNames = targetPlans.map((p) => p?.student).filter(Boolean);
         showIcsExportButton(
           successCount === 1
             ? "Ready to export this student's lesson sessions as .ics files?"
             : 'Ready to export these student lesson sessions as .ics files?',
-          allMilestones
+          allMilestones,
+          { studentNames: exportStudentNames }
         );
       }
     } catch (err) {
