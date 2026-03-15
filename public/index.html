@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Event Calendar Chat</title>
+    <title>Developer Calendar Workspace</title>
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
@@ -14,41 +14,120 @@
       - #signinGoogle currently uses a local test sign-in path unless full OAuth is restored.
       - Keep button IDs stable because JS relies on them for event binding.
     -->
-    <!-- SECTION: Main chat UI (header, messages, composer) -->
-    <main class="chat">
-      <header class="chat-header">
-        <div class="brand">
-          <div class="logo">📅</div>
-          <div class="titles">
-            <h1>Event Calendar</h1>
-            <p class="subtitle">Simple calendar assistant</p>
-          </div>
-        </div>
-        <div class="controls">
-          <button id="themeToggle" class="icon-btn" aria-label="Toggle theme">🌙</button>
-          <button id="clearBtnTop" class="linklike" aria-label="Clear conversation">Clear</button>
-          <div id="connectedUserName" class="connected-user" aria-live="polite" hidden></div>
-          <div class="auth-controls">
-            <button id="signinGoogle" class="auth-button" aria-label="Sign in with Google">Connect To Google Calendar</button>
-            <button id="signinMicrosoft" class="auth-button" aria-label="Sign in with Microsoft">Connect to Microsoft Calendar</button>
-          </div>
-        </div>
+    <div class="page-shell">
+      <header class="developer-topbar">
+        <div class="topbar-brand">BUILD ON COMMUNITY OS</div>
+        <div class="topbar-nav">Developers</div>
       </header>
 
-      <!-- Messages container (append chat bubbles here) -->
-      <div id="messages" class="messages" role="log" aria-live="polite"></div>
+      <section class="hero">
+        <p class="eyebrow">Developer Documentation</p>
+        <h1>Build Scheduling Workflows For Your Village Team.</h1>
+        <p class="hero-copy">
+          Plan student goals, align sessions to strengths, and export calendar invites with clear ownership.
+          Use the assistant below as your execution layer.
+        </p>
+      </section>
 
-      <form id="form" class="composer" aria-label="Chat composer">
-        <div class="composer-field">
-          <textarea id="input" rows="1" placeholder="" aria-label="Type a command or natural phrase" title="" autocomplete="off"></textarea>
+      <section class="paths">
+        <h2>I want to...</h2>
+        <div class="path-grid">
+          <article class="path-card">
+            <h3>Create Student Plans</h3>
+            <p>Generate lesson milestones from strengths and project goals.</p>
+          </article>
+          <article class="path-card">
+            <h3>Export By Person</h3>
+            <p>Download invites for one student or the selected student group.</p>
+          </article>
+          <article class="path-card">
+            <h3>Connect Calendars</h3>
+            <p>Link Google and Microsoft accounts from the workspace header.</p>
+          </article>
+          <article class="path-card">
+            <h3>Build Recurring Cadence</h3>
+            <p>Set task reminders and repeat frequencies for ongoing sessions.</p>
+          </article>
         </div>
-        <button id="sendBtn" type="submit" aria-label="Send message">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 21L23 12L2 3v7l15 2L2 14v7z" fill="currentColor"/></svg>
-        </button>
-        <div id="spinner" class="spinner" aria-hidden="true" hidden></div>
-      </form>
+      </section>
 
-    </main>
+      <section class="documentation">
+        <h2>Documentation</h2>
+        <div class="doc-columns">
+          <div>
+            <h3>Essentials</h3>
+            <ul>
+              <li>Platform Overview</li>
+              <li>Authentication</li>
+              <li>Getting Started</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Build Something</h3>
+            <ul>
+              <li>Student Planning Flow</li>
+              <li>MCP Tool Calls</li>
+              <li>Calendar Export Paths</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Reference</h3>
+            <ul>
+              <li>API Endpoints</li>
+              <li>CLI Steps</li>
+              <li>Troubleshooting</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="quickstart">
+        <h2>Start Building In Minutes</h2>
+        <div class="terminal-block" aria-label="Quickstart commands">
+          <div class="term-line"><span class="prompt">$</span> npm install -g @myvillage/cli</div>
+          <div class="term-line"><span class="prompt">$</span> myvillage login</div>
+          <div class="term-line"><span class="prompt">$</span> myvillage create</div>
+          <div class="term-line"><span class="prompt">$</span> myvillage agent start classroom-coach</div>
+          <p class="term-ok">✓ Workspace ready for planning and export.</p>
+        </div>
+      </section>
+
+      <!-- SECTION: Main chat UI (header, messages, composer) -->
+      <main class="chat">
+        <header class="chat-header">
+          <div class="brand">
+            <div class="logo">◉</div>
+            <div class="titles">
+              <h1>Calendar Workspace</h1>
+              <p class="subtitle">Plan by strengths. Export by person.</p>
+            </div>
+          </div>
+          <div class="controls">
+            <button id="themeToggle" class="icon-btn" aria-label="Toggle theme">☼</button>
+            <button id="clearBtnTop" class="linklike" aria-label="Clear conversation">Clear</button>
+            <div id="connectedUserName" class="connected-user" aria-live="polite" hidden></div>
+            <div class="auth-controls">
+              <button id="signinGoogle" class="auth-button" aria-label="Sign in with Google">Connect Google</button>
+              <button id="signinMicrosoft" class="auth-button" aria-label="Sign in with Microsoft">Connect Microsoft</button>
+            </div>
+          </div>
+        </header>
+
+        <!-- Messages container (append chat bubbles here) -->
+        <div id="messages" class="messages" role="log" aria-live="polite"></div>
+
+        <form id="form" class="composer" aria-label="Chat composer">
+          <div class="composer-field">
+            <textarea id="input" rows="1" placeholder="Ask for a personalized student plan, then export by scope..." aria-label="Type a command or natural phrase" title="" autocomplete="off"></textarea>
+          </div>
+          <button id="sendBtn" type="submit" aria-label="Send message">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 21L23 12L2 3v7l15 2L2 14v7z" fill="currentColor"/></svg>
+          </button>
+          <div id="spinner" class="spinner" aria-hidden="true" hidden></div>
+        </form>
+
+      </main>
+    </div>
 
     <script src="/script.js"></script>
   </body>
