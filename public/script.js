@@ -25,7 +25,6 @@ const spinner = document.getElementById('spinner');
 const sendBtn = document.getElementById('sendBtn');
 const clearBtn = document.getElementById('clearBtn');
 const clearBtnTop = document.getElementById('clearBtnTop');
-const themeToggle = document.getElementById('themeToggle');
 const connectedUserNameEl = document.getElementById('connectedUserName');
 
 let chat = [] // persisted messages
@@ -689,14 +688,6 @@ function load() {
 function setTheme(t){
   document.documentElement.setAttribute('data-theme', t);
   localStorage.setItem('ui_theme', t);
-  // update toggle icon and label
-  if (t === 'dark'){
-    themeToggle.textContent = '☀️';
-    themeToggle.setAttribute('aria-label','Switch to light theme');
-  } else {
-    themeToggle.textContent = '🌙';
-    themeToggle.setAttribute('aria-label','Switch to dark theme');
-  }
   // adjust text color in light mode
   if (t === 'light'){
     document.documentElement.style.color = '#071429';
@@ -891,12 +882,6 @@ function clearConversation(){
 }
 clearBtn?.addEventListener('click', clearConversation);
 clearBtnTop?.addEventListener('click', clearConversation);
-
-// Theme toggle
-themeToggle?.addEventListener('click', ()=>{
-  const cur = document.documentElement.getAttribute('data-theme') || 'dark';
-  setTheme(cur === 'dark' ? 'light' : 'dark');
-});
 
 // Keyboard: Enter to send, Shift+Enter for newline
 input.addEventListener('keydown', (e)=>{
