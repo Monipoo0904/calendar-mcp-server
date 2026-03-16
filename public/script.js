@@ -1270,6 +1270,13 @@ addLocalMessage = function(text, who) {
   if (who === 'bot') interceptGoalPrompt(text);
 };
 
+// Ensure the planning shortcut is present with the intro prompt on first render.
+// This covers startup order where the welcome message may be added before the hook above.
+if (!messages.querySelector('#startProjectBtn')) {
+  const intro = chat.find((m) => m?.who === 'bot' && /what would you like to accomplish\?/i.test(m?.text || ''));
+  if (intro) interceptGoalPrompt(intro.text);
+}
+
 /*
 Project-planning flow developer notes
 - Purpose: lightweight client-side helpers that let the bot prompt the user for a high-level goal,
