@@ -12,18 +12,18 @@ Developer notes (public/style.css)
   --brown: #4A382B;
   --white: #ffffff;
   --black: #000000;
-  --bg-1: #f4f2f0;
-  --bg-2: #faf9f8;
-  --ink: #4A382B;
+  --bg-1: #e8ebe5;
+  --bg-2: #f5f7f3;
+  --ink: #2d241d;
   --muted: #6b6058;
-  --panel: rgba(250, 249, 248, 0.95);
-  --line: rgba(74, 56, 43, 0.15);
+  --panel: rgba(250, 249, 248, 0.98);
+  --line: rgba(38, 66, 38, 0.25);
   --accent: #264226;
   --accent-strong: #1a2f1d;
   --accent-gold: #B18F40;
-  --chat-user: #e8f0e3;
+  --chat-user: #d4e8ce;
   --chat-bot: #f9faf8;
-  --shadow: 0 16px 36px rgba(38, 66, 38, 0.12);
+  --shadow: 0 16px 36px rgba(38, 66, 38, 0.18);
   color-scheme: light;
 }
 
@@ -77,7 +77,8 @@ body {
   font-family: 'IBM Plex Mono', monospace;
   letter-spacing: 0.08em;
   font-size: 0.8rem;
-  color: var(--brown);
+  color: var(--accent-gold);
+  font-weight: 600;
 }
 
 .topbar-nav {
@@ -109,8 +110,9 @@ body {
   font-family: 'IBM Plex Mono', monospace;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: var(--accent);
+  color: var(--accent-gold);
   font-size: 0.78rem;
+  font-weight: 600;
 }
 
 .hero h1 {
@@ -240,13 +242,14 @@ body {
 }
 
 .logo {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
-  background: var(--green);
+  background: linear-gradient(135deg, #264226 0%, #1a2f1d 100%);
   padding: 6px;
+  box-shadow: 0 4px 12px rgba(38, 66, 38, 0.25);
 }
 
 .logo img,
@@ -303,16 +306,17 @@ body {
 .connected-user {
   display: inline-flex;
   align-items: center;
-  padding: 6px 10px;
+  padding: 6px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(38, 66, 38, 0.3);
-  background: rgba(177, 143, 64, 0.18);
+  border: 2px solid var(--accent-gold);
+  background: rgba(177, 143, 64, 0.12);
   color: var(--brown);
   font-size: 0.8rem;
   max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 600;
 }
 
 .auth-controls {
@@ -432,9 +436,11 @@ body {
 
 .composer button {
   width: 48px;
-  background: var(--accent);
+  background: linear-gradient(135deg, #264226 0%, #1a2f1d 100%);
   color: var(--white);
   border-radius: 0 10px 10px 0;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(38, 66, 38, 0.2);
 }
 
 .spinner {
@@ -460,9 +466,10 @@ body {
 }
 
 .plan-primary-btn {
-  background: var(--accent) !important;
+  background: linear-gradient(135deg, #264226 0%, #1a2f1d 100%) !important;
   color: var(--white) !important;
   border-color: var(--accent) !important;
+  box-shadow: 0 4px 12px rgba(38, 66, 38, 0.2) !important;
 }
 
 .plan-secondary-btn {
