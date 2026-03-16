@@ -829,7 +829,7 @@ window.addEventListener('load', ()=> input.focus());
     }
   }
 
-  // Preferred Microsoft/Outlook connect flow used by the top header button.
+  // Preferred MyVillage account connect flow (backed by Microsoft OAuth endpoint).
   async function startMicrosoftCalendarConnect() {
     try {
       const origin = window.location.origin;
@@ -840,42 +840,22 @@ window.addEventListener('load', ()=> input.focus());
       const { data, text } = await parseJsonSafe(resp);
       const authUrl = data?.auth_url;
       if (resp.ok && authUrl) {
-        addLocalMessage('Opening Microsoft sign-in...', 'bot');
+        addLocalMessage('Opening MyVillage Project Account sign-in...', 'bot');
         window.location.href = authUrl;
         return;
       }
 
       // Local/dev fallback so button still behaves even before env vars are configured.
-      addLocalMessage('Microsoft OAuth is not configured yet. Opening fallback page.', 'bot');
+      addLocalMessage('MyVillage Project Account sign-in is not configured yet. Opening fallback page.', 'bot');
       window.location.href = '/redirect_microsoft.html';
     } catch (err) {
-      addLocalMessage('Could not start Microsoft Calendar connect flow. Using fallback page.', 'bot');
+      addLocalMessage('Could not start MyVillage Project Account connect flow. Using fallback page.', 'bot');
       window.location.href = '/redirect_microsoft.html';
     }
   }
 
-  const gbtn = document.getElementById('signinGoogle');
-  const mbtn = document.getElementById('signinMicrosoft');
-  // For testing locally we provide a simple test handler that doesn't perform OAuth.
-  function testSignIn(provider){
-    console.log('Sign-in clicked:', provider);
-    addLocalMessage(`${provider} sign-in clicked`, 'user');
-    addLocalMessage(`(Test) Simulated auth response for ${provider}.`, 'bot');
-    // small delay so messages render before navigation
-    setTimeout(() => {
-      if (provider === 'Google') {
-        window.location.href = '/redirect_google.html';
-      } else if (provider === 'Microsoft') {
-        // direct to Microsoft domain per request
-        window.location.href = 'https://www.microsoft.com';
-      } else {
-        window.location.href = 'https://www.google.com';
-      }
-    }, 700);
-  }
-
-  if (gbtn) gbtn.addEventListener('click', () => testSignIn('Google'));
-  if (mbtn) mbtn.addEventListener('click', () => startMicrosoftCalendarConnect());
+  const mvpBtn = document.getElementById('signinMvpAccount');
+  if (mvpBtn) mvpBtn.addEventListener('click', () => startMicrosoftCalendarConnect());
 
 // Keep theme set when page loads
 loadTheme();
