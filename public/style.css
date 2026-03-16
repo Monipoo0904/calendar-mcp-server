@@ -4,20 +4,26 @@ Developer notes (public/style.css)
 - Keep existing chat class/id hooks because public/script.js depends on them.
 */
 
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  --bg-1: #efe4d5;
-  --bg-2: #f8f2e8;
-  --ink: #2d241d;
-  --muted: #6d6258;
-  --panel: rgba(255, 251, 245, 0.86);
-  --line: rgba(61, 49, 39, 0.15);
-  --accent: #8e5c35;
-  --accent-strong: #6f4222;
-  --chat-user: #ead4bf;
-  --chat-bot: #fff8ef;
-  --shadow: 0 16px 36px rgba(53, 35, 20, 0.14);
+  --green: #264226;
+  --gold: #B18F40;
+  --brown: #4A382B;
+  --white: #ffffff;
+  --black: #000000;
+  --bg-1: #f4f2f0;
+  --bg-2: #faf9f8;
+  --ink: #4A382B;
+  --muted: #6b6058;
+  --panel: rgba(250, 249, 248, 0.95);
+  --line: rgba(74, 56, 43, 0.15);
+  --accent: #264226;
+  --accent-strong: #1a2f1d;
+  --accent-gold: #B18F40;
+  --chat-user: #e8f0e3;
+  --chat-bot: #f9faf8;
+  --shadow: 0 16px 36px rgba(38, 66, 38, 0.12);
   color-scheme: light;
 }
 
@@ -28,11 +34,11 @@ Developer notes (public/style.css)
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Sora', sans-serif;
   color: var(--ink);
   background:
-    radial-gradient(circle at 0% 0%, rgba(170, 121, 76, 0.14), transparent 34%),
-    radial-gradient(circle at 95% 10%, rgba(96, 64, 40, 0.16), transparent 38%),
+    radial-gradient(circle at 0% 0%, rgba(38, 66, 38, 0.12), transparent 34%),
+    radial-gradient(circle at 95% 12%, rgba(26, 47, 29, 0.11), transparent 36%),
     linear-gradient(160deg, var(--bg-1), var(--bg-2));
   padding: 28px 18px 36px;
 }
@@ -71,7 +77,7 @@ body {
   font-family: 'IBM Plex Mono', monospace;
   letter-spacing: 0.08em;
   font-size: 0.8rem;
-  color: var(--accent-strong);
+  color: var(--brown);
 }
 
 .topbar-nav {
@@ -103,7 +109,7 @@ body {
   font-family: 'IBM Plex Mono', monospace;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: var(--accent-strong);
+  color: var(--accent);
   font-size: 0.78rem;
 }
 
@@ -188,11 +194,11 @@ body {
 
 .terminal-block {
   border-radius: 12px;
-  border: 1px solid rgba(59, 42, 30, 0.22);
+  border: 1px solid rgba(74, 56, 43, 0.22);
   background: #2f241d;
   color: #efe8df;
   padding: 14px;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'JetBrains Mono', monospace;
 }
 
 .term-line {
@@ -216,7 +222,7 @@ body {
   flex-direction: column;
   min-height: 62vh;
   padding: 18px;
-  background: rgba(255, 252, 247, 0.9);
+  background: var(--panel);
 }
 
 .chat-header {
@@ -239,9 +245,15 @@ body {
   border-radius: 10px;
   display: grid;
   place-items: center;
-  background: linear-gradient(140deg, #bc8e67, #8e5c35);
-  color: #fff;
-  font-weight: 700;
+  background: var(--green);
+  padding: 6px;
+}
+
+.logo img,
+.logo svg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .titles h1 {
@@ -268,7 +280,7 @@ body {
 .copy,
 .composer button {
   border-radius: 10px;
-  border: 1px solid rgba(75, 55, 39, 0.2);
+  border: 1px solid rgba(74, 56, 43, 0.2);
   cursor: pointer;
   font-family: inherit;
   transition: transform 160ms ease, background 160ms ease;
@@ -293,9 +305,9 @@ body {
   align-items: center;
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(80, 114, 71, 0.22);
-  background: rgba(188, 230, 197, 0.52);
-  color: #23432b;
+  border: 1px solid rgba(38, 66, 38, 0.3);
+  background: rgba(177, 143, 64, 0.18);
+  color: var(--brown);
   font-size: 0.8rem;
   max-width: 240px;
   overflow: hidden;
@@ -310,8 +322,8 @@ body {
 }
 
 .auth-controls .auth-button {
-  background: #fff9f1;
-  color: var(--ink);
+  background: var(--white);
+  color: var(--brown);
   font-size: 0.84rem;
   padding: 9px 12px;
   font-weight: 600;
@@ -350,14 +362,14 @@ body {
   border-radius: 10px;
   display: grid;
   place-items: center;
-  background: rgba(116, 79, 53, 0.12);
-  color: #4b331f;
+  background: rgba(74, 56, 43, 0.12);
+  color: var(--brown);
 }
 
 .message .bubble {
   max-width: 80%;
   border-radius: 12px;
-  border: 1px solid rgba(83, 59, 41, 0.15);
+  border: 1px solid rgba(74, 56, 43, 0.15);
   padding: 11px 12px;
   color: var(--ink);
   background: var(--chat-bot);
@@ -405,7 +417,7 @@ body {
   resize: none;
   overflow-y: auto;
   border-radius: 10px 0 0 10px;
-  border: 1px solid rgba(75, 55, 39, 0.24);
+  border: 1px solid rgba(74, 56, 43, 0.24);
   border-right: 0;
   background: #fffcf7;
   color: var(--ink);
@@ -415,13 +427,13 @@ body {
 }
 
 .composer textarea::placeholder {
-  color: #84786c;
+  color: var(--muted);
 }
 
 .composer button {
   width: 48px;
   background: var(--accent);
-  color: #fff;
+  color: var(--white);
   border-radius: 0 10px 10px 0;
 }
 
@@ -430,7 +442,7 @@ body {
   height: 22px;
   margin-left: 8px;
   border-radius: 999px;
-  border: 2px solid rgba(105, 72, 47, 0.18);
+  border: 2px solid rgba(38, 66, 38, 0.2);
   border-top-color: var(--accent);
   animation: spin 900ms linear infinite;
 }
@@ -449,7 +461,7 @@ body {
 
 .plan-primary-btn {
   background: var(--accent) !important;
-  color: #fff !important;
+  color: var(--white) !important;
   border-color: var(--accent) !important;
 }
 
