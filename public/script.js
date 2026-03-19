@@ -272,6 +272,7 @@ async function submitPersonalizedLessonPlans(userText, flowOptions = {}) {
   const requestedStudents = extractRequestedStudentNames(userText);
   const lessonGoal = String(flowOptions?.lessonGoal || '').trim();
   const deadline = String(flowOptions?.deadline || '').trim();
+  const studentPersonalizedGoals = flowOptions?.studentPersonalizedGoals || {};
   try {
     const res = await fetch(getApiUrl(), {
       method: 'POST',
@@ -281,6 +282,7 @@ async function submitPersonalizedLessonPlans(userText, flowOptions = {}) {
         input: {
           students: requestedStudents,
           lesson_goal: lessonGoal,
+          student_personalized_goals: studentPersonalizedGoals,
           deadline,
           max_students: 12,
         }
@@ -654,11 +656,25 @@ async function startMvpStudentPlanningFlow() {
       return;
     }
 
+    // Collect personalized project goals for each student
+    const studentPersonalizedGoals = {};
+    for (const student of selectedStudents) {
+      const personalizedGoal = prompt(
+        `Describe what ${student} can specifically do for this project\n\n` +
+        `(Consider their strengths and unique contribution to "${projectGoal.trim()}")`
+      );
+      if (personalizedGoal === null) {
+        addLocalMessage('Personalized goal collection cancelled.', 'bot');
+        return;
+      }
+      studentPersonalizedGoals[student] = personalizedGoal.trim() || projectGoal.trim();
+    }
+
     const selectedCsv = selectedStudents.join(', ');
     addLocalMessage(`Create personalized lesson plans for ${selectedCsv}`, 'user');
     await submitPersonalizedLessonPlans(
       `Create personalized lesson plans for ${selectedCsv}`,
-      { preselectedStudents: selectedStudents, lessonGoal: projectGoal.trim(), deadline }
+      { preselectedStudents: selectedStudents, lessonGoal: projectGoal.trim(), studentPersonalizedGoals, deadline }
     );
   } catch (err) {
     removeTyping();

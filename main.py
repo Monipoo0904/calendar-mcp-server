@@ -335,12 +335,13 @@ def _compute_additional_student_recommendations(
 
 
 @mcp.tool()
-def personalized_lesson_plans(students: str = "", lesson_goal: str = "", max_students: int = 10, deadline: str = "") -> dict:
+def personalized_lesson_plans(students: str = "", lesson_goal: str = "", student_personalized_goals: dict = None, max_students: int = 10, deadline: str = "") -> dict:
   """Build personalized lesson plans from webhook student skill rows.
 
   Arguments:
   - students: comma-separated names or partial names. Empty means all students.
   - lesson_goal: optional focus string applied to each generated plan.
+  - student_personalized_goals: optional dict mapping student names to personalized project goals.
   - max_students: cap for response size; bounded server-side for safety.
 
   Returns:
@@ -349,6 +350,8 @@ def personalized_lesson_plans(students: str = "", lesson_goal: str = "", max_stu
   - lesson_plans: per-student strengths-based sessions.
   - summary: human-readable text for direct chat display.
   """
+  if student_personalized_goals is None:
+    student_personalized_goals = {}
   try:
     max_n = max(1, min(int(max_students), 50))
   except Exception:
@@ -389,7 +392,13 @@ def personalized_lesson_plans(students: str = "", lesson_goal: str = "", max_stu
     ]
 
   selected = filtered[:max_n]
-  lesson_plans = [_make_lesson_plan_for_student(s, lesson_goal=lesson_goal) for s in selected]
+  lesson_plans = [
+    _make_lesson_plan_for_student(
+      s, 
+      lesson_goal=student_personalized_goals.get(s.get("student", "")) or lesson_goal
+    ) 
+    for s in selected
+  ]
   available_students = [s.get("student", "") for s in students_index if s.get("student")]
   selected_students = [s.get("student", "") for s in selected if s.get("student")]
   recommended_additional_students = _compute_additional_student_recommendations(
