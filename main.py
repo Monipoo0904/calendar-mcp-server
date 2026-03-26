@@ -155,11 +155,116 @@ def _build_student_strength_index(rows: List[dict]) -> List[dict]:
 
 
 def _make_lesson_plan_for_student(student: dict, lesson_goal: str = "") -> dict:
-  """Create a lightweight, strengths-based lesson plan for one student.
+  """Create a strengths-based lesson plan for one student.
+
+  When LLM_API_KEY is set, delegates to the LLM for fully personalized content.
+  Otherwise falls back to a heuristic template.
 
   The resulting `sessions` array is intentionally compatible with the client
   helper that transforms sessions into calendar milestones.
   """
+  llm_key = os.getenv("LLM_API_KEY")
+  if llm_key:
+    result = _make_lesson_plan_for_student_llm(student, lesson_goal, llm_key)
+    if result:
+      return result
+  return _make_lesson_plan_for_student_heuristic(student, lesson_goal)
+
+
+def _make_lesson_plan_for_student_llm(student: dict, lesson_goal: str, llm_key: str) -> dict | None:
+  """Call the LLM to generate a fully personalized lesson plan for one student.
+
+  Returns a lesson-plan dict on success, or None if the call fails so the
+  caller can fall back to the heuristic.
+  """
+  name = student.get("student", "Student")
+  strengths = student.get("strengths") or []
+  skill_counts = student.get("skill_counts") or {}
+  last_check_in = student.get("last_check_in", "")
+  goal_text = lesson_goal.strip() if isinstance(lesson_goal, str) else ""
+
+  skills_detail = ", ".join(
+    f"{skill} (seen {count}x)" for skill, count in
+    sorted(skill_counts.items(), key=lambda x: -x[1])
+  ) or "no recorded skills"
+
+  prompt = (
+    "You are an expert educational coach who writes deeply personalized lesson plans.\n"
+    "Given a student's name, their recorded skill strengths, and an optional lesson goal, "
+    "create a 3-session lesson plan tailored specifically to THIS student.\n\n"
+    "Important: do NOT use generic templates. Write session titles, objectives, and "
+    "activities that reference this student's actual strengths and the lesson goal directly.\n\n"
+    f"Student name: {name}\n"
+    f"Top strengths (ranked): {', '.join(strengths) if strengths else 'none recorded'}\n"
+    f"Full skill history: {skills_detail}\n"
+    f"Last check-in: {last_check_in or 'unknown'}\n"
+    f"Lesson goal: {goal_text or 'general growth and confidence-building'}\n\n"
+    "Return ONLY a JSON object with these keys:\n"
+    "  focus (string): a one-sentence personalized focus for this student\n"
+    "  student_objective (string): what the student will achieve across these sessions\n"
+    "  sessions (array of 3 objects, each with: title, objective, activities (array of 3 strings))\n\n"
+    "Every session title, objective, and activity must be specific to this student. "
+    "Do not use placeholders. Output pure JSON, no extra text."
+  )
+
+  try:
+    model = os.getenv("OPENROUTER_MODEL", "google/gemini-3-flash-preview")
+    headers = {
+      "Authorization": f"Bearer {llm_key}",
+      "Content-Type": "application/json",
+    }
+    payload = {
+      "model": model,
+      "messages": [
+        {"role": "system", "content": "You output only JSON."},
+        {"role": "user", "content": prompt},
+      ],
+      "temperature": 0.5,
+      "max_tokens": 900,
+    }
+    resp = httpx.post(
+      "https://openrouter.ai/api/v1/chat/completions",
+      json=payload,
+      headers=headers,
+      timeout=25.0,
+    )
+    if resp.status_code != 200:
+      return None
+
+    body = resp.json()
+    text = body.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+    # Parse JSON — tolerate markdown code fences
+    parsed = None
+    try:
+      parsed = json.loads(text)
+    except Exception:
+      start = text.find("{")
+      end = text.rfind("}")
+      if start != -1 and end != -1 and end > start:
+        try:
+          parsed = json.loads(text[start:end + 1])
+        except Exception:
+          pass
+
+    if not isinstance(parsed, dict) or "sessions" not in parsed:
+      return None
+
+    return {
+      "student": name,
+      "last_check_in": last_check_in,
+      "focus": parsed.get("focus", goal_text or f"Personalized growth for {name}"),
+      "student_objective": parsed.get("student_objective", ""),
+      "strengths": strengths,
+      "sessions": parsed.get("sessions", []),
+      "llm_personalized": True,
+    }
+  except Exception:
+    return None
+
+
+def _make_lesson_plan_for_student_heuristic(student: dict, lesson_goal: str = "") -> dict:
+  """Heuristic (no-LLM) fallback for lesson plan generation."""
   name = student.get("student", "Student")
   last_check_in = student.get("last_check_in", "")
   strengths = student.get("strengths") or []
@@ -335,23 +440,27 @@ def _compute_additional_student_recommendations(
 
 
 @mcp.tool()
-def personalized_lesson_plans(students: str = "", lesson_goal: str = "", student_personalized_goals: dict = None, max_students: int = 10, deadline: str = "") -> dict:
-  """Build personalized lesson plans from webhook student skill rows.
+def personalized_lesson_plans(students: str = "", lesson_goal: str = "", max_students: int = 10, deadline: str = "") -> dict:
+  """Build LLM-personalized lesson plans from webhook student skill rows.
+
+  When LLM_API_KEY is set, each student's plan is generated by the LLM using
+  their individual strengths, skill history, and the shared lesson goal —
+  producing unique, non-template content per student. Falls back to
+  heuristic generation when no LLM key is configured.
 
   Arguments:
   - students: comma-separated names or partial names. Empty means all students.
-  - lesson_goal: optional focus string applied to each generated plan.
-  - student_personalized_goals: optional dict mapping student names to personalized project goals.
+  - lesson_goal: optional shared focus / project goal applied to all plans.
   - max_students: cap for response size; bounded server-side for safety.
+  - deadline: optional YYYY-MM-DD used for additional student recommendations.
 
   Returns:
   - available_students: full directory for UI selection.
   - selected_students: names matched by the students filter.
-  - lesson_plans: per-student strengths-based sessions.
+  - lesson_plans: per-student personalized sessions.
+  - llm_personalized: true when plans were generated by the LLM.
   - summary: human-readable text for direct chat display.
   """
-  if student_personalized_goals is None:
-    student_personalized_goals = {}
   try:
     max_n = max(1, min(int(max_students), 50))
   except Exception:
@@ -393,12 +502,11 @@ def personalized_lesson_plans(students: str = "", lesson_goal: str = "", student
 
   selected = filtered[:max_n]
   lesson_plans = [
-    _make_lesson_plan_for_student(
-      s, 
-      lesson_goal=student_personalized_goals.get(s.get("student", "")) or lesson_goal
-    ) 
+    _make_lesson_plan_for_student(s, lesson_goal=lesson_goal)
     for s in selected
   ]
+  using_llm = any(plan.get("llm_personalized") for plan in lesson_plans)
+
   available_students = [s.get("student", "") for s in students_index if s.get("student")]
   selected_students = [s.get("student", "") for s in selected if s.get("student")]
   recommended_additional_students = _compute_additional_student_recommendations(
@@ -408,14 +516,23 @@ def personalized_lesson_plans(students: str = "", lesson_goal: str = "", student
     deadline=deadline,
   )
 
+  personalization_note = (
+    "Plans were personalized by the LLM based on each student's individual strengths and skill history."
+    if using_llm else
+    "Plans were generated using heuristic templates (set LLM_API_KEY to enable full LLM personalization)."
+  )
+
   summary_lines = [
     f"Personalized lesson plans generated for {len(lesson_plans)} student(s).",
+    personalization_note,
     f"Source: {STUDENT_SKILLS_WEBHOOK_URL}",
   ]
   for plan in lesson_plans:
     strengths = ", ".join(plan.get("strengths") or ["(no skills reported)"])
     summary_lines.append("")
     summary_lines.append(f"{plan['student']} | strengths: {strengths}")
+    if plan.get("focus"):
+      summary_lines.append(f"  Focus: {plan['focus']}")
     for idx, sess in enumerate(plan.get("sessions", []), start=1):
       summary_lines.append(f"  {idx}. {sess['title']} - {sess['objective']}")
 
@@ -435,6 +552,7 @@ def personalized_lesson_plans(students: str = "", lesson_goal: str = "", student
     "deadline": deadline,
     "count": len(lesson_plans),
     "lesson_plans": lesson_plans,
+    "llm_personalized": using_llm,
     "summary": "\n".join(summary_lines),
   }
 
