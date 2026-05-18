@@ -1,222 +1,285 @@
-# Vercel Event Calendar (Demo)
+# MVP Calendar Workspace
 
-This repository is a Vercel-compatible demo of an MCP-based Event Calendar server.
+> **Branch:** `demo/rag-expansion` — RAG knowledge base + AI-powered Q&A layer on top of the existing calendar and student planning system.
 
-- API endpoint: `/api/mcp`
-- Frontend: `public/index.html` (conversational chat UI)
+A Vercel-deployed MCP server + conversational chat UI for the **MyVillage Project** educational program. Coaches and program managers can ask natural-language questions, generate personalized student lesson plans, and export calendar invites — all from one interface.
 
-## How the Chat Works
+| | |
+|---|---|
+| **API endpoint** | `POST /api/mcp` |
+| **Frontend** | `public/index.html` — conversational chat UI |
+| **Branch** | `demo/rag-expansion` |
+| **Python** | 3.12+ · FastAPI · FastMCP · httpx |
+| **Deploy** | Vercel serverless (zero config) |
 
-The chat uses a **conversational, intent-aware** flow:
+---
 
-### Chat Process Flow
+## What This Demo Shows
 
-1. **User enters a message** in the composer
-   - Press `Enter` to send, or `Shift+Enter` for a newline
-   - Message is added to the chat and displayed immediately as a user message
+This project was built to demonstrate three things end-to-end:
 
-2. **Intent detection** — the frontend checks if the message looks like a **student lesson planning** request
-   - If yes → special student planning flow (multi-step, with student selection and personalized goals)
-   - If no → standard **`handle_message`** tool flow (see below)
+### 1 — Backend Flow
+A FastAPI + [FastMCP](https://github.com/jlowin/fastmcp) server maps every chat message to an MCP tool call via `POST /api/mcp`. Intent detection happens on the frontend before the request is sent — student planning, RAG queries, and calendar commands each route to a different tool. The entire flow is visible in [main.py](main.py) and [api/mcp.py](api/mcp.py).
 
-3. **Standard `handle_message` flow** (for calendar events, queries, and general commands)
-   - Sends the message to the backend tool: `POST /api/mcp` with `{ tool: 'handle_message', input: { message } }`
-   - Shows a typing indicator while waiting
-   - Backend parses the message with natural language support
-   - Backend returns a result (e.g., event added, list of events, error)
-   - Result is displayed as a bot message in the chat
-   - Input is re-enabled
+### 2 — Data Interaction (RAG)
+Retrieval-Augmented Generation is implemented end-to-end with **no external vector database**:
 
-4. **Recurrence prompts** — after adding an event, the UI may show recurrence options
-   - User selects a recurrence type (daily, weekly, custom, etc.)
-   - Sends `set_recurrence` tool call with the selected frequency
-   - Recurrence is stored with the event (in-memory; resets on redeploy)
-
-5. **Export .ics** — after creating events or a plan
-   - An export button is offered in the chat
-   - Click to download a standard iCalendar file (`.ics`)
-   - Optional: export by student or scope (requires `personalized_lesson_plans` tool)
-
-### Supported Commands & Natural Language
-
-The `handle_message` tool understands both **terse commands** and **natural language**:
-
-- **List events**
-  - `list` / `list events` → all events
-  - `list events on 2026-01-01` / `What's on 2026-01-01?` → events for that date
-  - Shorthand: `list:2026-01-01`
-
-- **Add events** (supports times)
-  - `Add Birthday on 2026-02-01` → all-day event
-  - `Add Meeting March 5 about planning` → natural language parsing
-  - `Add Lunch tomorrow` → recognizes `today` / `tomorrow`
-  - `Add Meeting on 2026-02-01 at 14:30` → time-specific event
-  - Shorthand: `add:Title|YYYY-MM-DD|Desc` or `add:Title|YYYY-MM-DD HH:MM|Desc`
-  - Time ranges: `Add Meeting on 2026-02-01 from 3pm to 5pm` → sets both start and end times
-
-- **Delete events**
-  - `delete Meeting` / `remove Birthday` → by title
-  - Shorthand: `delete:Title`
-
-- **Summarize**
-  - `summarize` / `summary` / `what's coming up` → upcoming events overview
-
-- **Help**
-  - If a message isn't understood, the server returns a short help text with examples
-
-### Student Lesson Planning Flow
-
-If the chat detects a message like *"create lesson plans for students"*, it triggers the **student planning flow**:
-
-1. **Fetch available students** from the configured webhook (`STUDENT_SKILLS_WEBHOOK_URL`)
-2. **Multi-select interface** — user picks which students to plan for
-3. **Personalized goals** — for each student, user provides a custom objective
-4. **Generate plans** — backend calls `personalized_lesson_plans` tool
-5. **Create calendar tasks** — user is offered per-student calendar creation
-6. **Export as .ics** — option to export all selected students' milestones as individual `.ics` files
-
-## Local Testing & Development
-
-1. Install dev dependencies:
-
-```bash
-python -m pip install -r requirements.txt
+```
+User question
+     │
+     ▼
+TF-IDF retriever  ──→  top-k chunks from knowledge_base.json
+     │
+     ▼
+LLM (OpenRouter / Gemini)  ──→  synthesized, grounded answer
+     │
+     ▼
+Response with source citations shown in the UI
 ```
 
-2. Run the local test harness:
+- Knowledge base: [`data/knowledge_base.json`](data/knowledge_base.json) — 10 program documents
+- Retriever: pure-Python TF-IDF cosine similarity (`_retrieve_chunks` in [main.py](main.py)) — no numpy, no heavy deps, runs on Vercel's serverless runtime
+- LLM synthesis: `ask_knowledge_base` tool calls OpenRouter when `LLM_API_KEY` is set; falls back to best-excerpt summary without it
+- Student data: pulled live from an n8n webhook, indexed by student, used to generate personalized lesson plans via the LLM
 
-```bash
-python test_local.py
+### 3 — Live UI
+The chat UI at `public/index.html` handles all three flows in one conversation:
+- RAG answers with **source chips** (document title + section)
+- Student plan generation with a multi-select student picker
+- Calendar event creation, recurrence, and `.ics` export
+
+---
+
+## Chat Flow
+
+The frontend uses a three-path intent router before every send:
+
+```
+User message
+     │
+     ├─ looksLikeStudentPlanRequest()  ──→  submitPersonalizedLessonPlans()
+     │
+     ├─ looksLikeKnowledgeBaseQuery()  ──→  submitKnowledgeBaseQuery()
+     │                                        └─ calls ask_knowledge_base tool
+     │                                        └─ renders answer + source chips
+     │
+     └─ everything else  ──→  handle_message tool
+                               ├─ add / list / delete calendar events
+                               ├─ summarize upcoming
+                               └─ fallback help text
 ```
 
-3. Open your browser to the printed URL (usually `http://localhost:3000`)
+### Calendar Commands
 
-4. Start adding events! Try:
-   - `Add Birthday on 2026-02-01`
-   - `Add Meeting March 5 about planning`
-   - `Add Lunch tomorrow`
-   - `list` or `what's coming up`
-   - Short form: `add:Meeting|2026-03-01|with team`
+The `handle_message` tool understands natural language and terse shorthands:
 
-### Deploy to Vercel
+| Intent | Examples |
+|---|---|
+| List all events | `list` · `list events` · `what's coming up` |
+| List by date | `list events on 2026-01-01` · `What's on March 5?` |
+| Add event | `Add Birthday on 2026-02-01` · `Add Lunch tomorrow` |
+| Add with time | `Add Meeting on 2026-03-03 at 2pm` |
+| Add time range | `Add Meeting on 2026-03-03 from 3pm to 5pm` |
+| Delete | `delete Meeting` · `remove Birthday` |
+| Summarize | `summarize` · `summary` · `brief` |
+| Shorthand add | `add:Title\|YYYY-MM-DD\|Description` |
 
-1. Ensure `vercel` CLI is installed and logged in: `npm install -g vercel`
-2. Run `vercel deploy` and follow prompts
-3. Your endpoint will be at `https://<project>.vercel.app/api/mcp`
+### Student Lesson Planning
 
-### Microsoft Calendar OAuth (Optional)
+Triggered by phrases like *"lesson plans"*, *"student plans"*, *"personalized lesson"*:
 
-The demo includes Microsoft Outlook integration. To enable it:
+1. Fetch available students from the n8n webhook (`STUDENT_SKILLS_WEBHOOK_URL`)
+2. Multi-select student picker in chat
+3. Optional: set per-student personalized goals
+4. Backend generates LLM-personalized lesson plans (or heuristic fallback)
+5. Calendar milestone creation per student
+6. Export each student's sessions as individual `.ics` files
 
-1. Set environment variables:
-   - `MS_CLIENT_ID` — Azure AD application client ID
-   - `MS_CLIENT_SECRET` — Azure AD application secret
-   - `MS_TENANT_ID` (optional, default: `common`)
-   - `MS_REDIRECT_URI` (optional, default: `<base>/api/oauth/microsoft/callback`)
+### Knowledge Base Q&A (RAG)
 
-2. The "Connect to Microsoft Calendar" button will:
-   - Call `GET /api/oauth/microsoft/start` (builds auth URL)
-   - Redirect user to Microsoft login
-   - Callback at `GET /api/oauth/microsoft/callback` exchanges code for token
-   - Frontend displays `Connected: <name>` in the header
+Triggered by question patterns like *"What is…"*, *"How does…"*, *"Tell me about…"*:
 
-3. If environment variables are not configured, the button falls back to a dev redirect page (`redirect_microsoft.html`)
+1. Frontend calls `ask_knowledge_base` directly (bypasses `handle_message`)
+2. TF-IDF retriever ranks all 10 KB documents against the query
+3. Top-3 chunks passed to LLM as context
+4. LLM returns a grounded answer (or best excerpt if no `LLM_API_KEY`)
+5. UI renders answer with a **RAG ✦ AI Answer** badge and source chips
 
-## Notes
+**Try these queries in the chat:**
+- `What is MyVillage Project?`
+- `How does enrollment work?`
+- `What are coaches responsible for?`
+- `How does the AI planning assistant work?`
+- `What do students present at the capstone?`
 
-- Vercel serverless functions are stateless — events are stored in-memory and **will reset** frequently
-- The demo includes a **conversational** `handle_message` tool (see "Supported Commands & Natural Language" above)
-- All MCP tools are exposed via `POST /api/mcp` with shape: `{ tool: 'tool_name', input: { ... } }`
-- Chat messages persist in browser **localStorage** (key: `chat_messages`), so conversations survive page reloads
+---
+
+## Knowledge Base
+
+[`data/knowledge_base.json`](data/knowledge_base.json) — 10 documents covering the full program:
+
+| ID | Document | Source |
+|---|---|---|
+| `prog-overview` | Program Overview | Program Guide §1 |
+| `enrollment-process` | Enrollment & Onboarding | Program Guide §2 |
+| `coaching-model` | The MVP Coaching Model | Coaching Handbook Ch.1 |
+| `skills-database` | Student Skills Database & Check-In System | Tech Infrastructure Guide |
+| `rag-and-ai` | AI-Powered Planning Assistant | Tech Infrastructure Guide |
+| `calendar-export` | Calendar Invites & .ics Export | Program Guide §4 |
+| `coach-expectations` | Coach Responsibilities & Expectations | Coaching Handbook Ch.2 |
+| `capstone-projects` | Capstone Project Requirements | Program Guide §5 |
+| `data-privacy` | Student Data Privacy & FERPA Compliance | Policy Manual §3 |
+| `site-locations` | Program Sites & Locations | Program Guide §1 |
+| `outcomes` | Program Outcomes & Impact Data | 2024 Impact Report |
+
+To add documents: append objects to the JSON array with `id`, `title`, `source`, and `content` fields. The retriever reloads at module import — no code changes needed.
+
+---
 
 ## Backend Tools
 
-The MCP server exposes these main tools (called from the chat):
+All tools are called via `POST /api/mcp` with shape `{ "tool": "tool_name", "input": { ... } }`.
 
-- **`handle_message`** — parses a user text message and routes to appropriate action (add event, list, delete, summarize, etc.)
-- **`add_event`** — creates a calendar event (called internally by `handle_message`)
-- **`set_recurrence`** — sets a recurrence pattern on an existing event (called after user clicks recurrence option)
-- **`create_tasks`** — creates a multi-step plan as calendar milestones (called during project planning flow)
-- **`personalized_lesson_plans`** — fetches from webhook and generates student-specific lesson plans
-- **`export_ics`** — generates a `.ics` (iCalendar) file for download
+| Tool | Description |
+|---|---|
+| `handle_message` | Routes natural-language messages to calendar actions |
+| `ask_knowledge_base` | RAG: retrieves chunks → LLM synthesizes answer → returns with sources |
+| `search_knowledge_base` | Returns raw ranked chunks for a query (no LLM synthesis) |
+| `personalized_lesson_plans` | Fetches student data from webhook + generates LLM lesson plans |
+| `add_event` | Creates a calendar event (called internally by `handle_message`) |
+| `set_recurrence` | Sets a recurrence pattern on an existing event |
+| `create_tasks` | Creates multi-step milestones from a project goal |
+| `research_and_breakdown` | LLM-powered project planning and milestone generation |
 
-See [main.py](main.py) for tool implementations and [api/mcp.py](api/mcp.py) for the serverless FastAPI wrapper.
+---
 
-## Editor Guide: Where to Edit Behavior
+## Environment Variables
 
-### Chat Parser & Event Logic
+| Variable | Required | Description |
+|---|---|---|
+| `LLM_API_KEY` | Recommended | OpenRouter API key — enables LLM synthesis in RAG and lesson plans |
+| `OPENROUTER_MODEL` | Optional | Model to use (default: `google/gemini-flash-1.5`) |
+| `STUDENT_SKILLS_WEBHOOK_URL` | Optional | n8n webhook for live student skill data |
+| `MS_CLIENT_ID` | Optional | Azure AD client ID for Microsoft Calendar OAuth |
+| `MS_CLIENT_SECRET` | Optional | Azure AD client secret |
+| `MS_TENANT_ID` | Optional | Azure AD tenant (default: `common`) |
+| `MS_REDIRECT_URI` | Optional | OAuth callback URI |
 
-- **File**: [main.py](main.py)
-  - **Conversational parsing**: `handle_message(message)` — natural language parsing logic, date/time detection
-  - **Date detection**: `find_date_in_msg(msg)` — extracts dates like "tomorrow", "March 5", "2026-01-01"
-  - **Time normalization**: `parse_time_token(token)` — parses times like "3pm", "14:30", "3pm-5pm"
-  - **Event storage**: `add_event(title, date, description)` — validation and in-memory storage
-  - **Recurrence logic**: `set_recurrence(title, frequency, interval)` — computes next recurrence dates
+Without `LLM_API_KEY`, RAG answers fall back to the best-matching document excerpt and lesson plans use the heuristic template generator. Everything else works without any keys.
 
-### Frontend Chat UI
+---
 
-- **File**: [public/script.js](public/script.js)
-  - **Chat input handler**: `form.addEventListener('submit', ...)` (line 912) — intercepts form submission
-  - **Intent detection**: `looksLikeStudentPlanRequest(text)` — regex check for student planning keywords
-  - **Message rendering**: `renderMessage(msg)` — DOM creation for chat bubbles, timestamps, copy buttons
-  - **Message persistence**: `load()` and `save()` — localStorage read/write
-  - **Typing indicator**: `showTyping()` / `removeTyping()` — animated dots while fetching
-  - **Recurrence UI**: `showRecurrencePrompt(title)` — button grid for recurrence choices
+## Local Setup
 
-- **File**: [public/index.html](public/index.html)
-  - **Chat layout**: `#messages` (role="log", aria-live="polite") — main message container
-  - **Input composer**: `#input` (textarea), `#form` (submit), `#sendBtn` — message input and send button
-  - **Help text**: bottom `p.help` paragraph — shows example commands to users
+```bash
+# 1. Clone and activate venv
+git clone <repo> && cd vercel-event-calendar-mcp
+python -m venv .venv && source .venv/bin/activate
 
-### Making Common Changes
+# 2. Install dependencies
+pip install -r requirements.txt
 
-1. **Edit example commands shown to users**
-   - File: [public/index.html](public/index.html) — edit the `p.help` paragraph at bottom
-   - File: [public/script.js](public/script.js) — edit the welcome message in `addLocalMessage(...)`
+# 3. (Optional) set your LLM key
+export LLM_API_KEY=sk-or-...
 
-2. **Add a new recurrence type**
-   - File: [public/script.js](public/script.js#L950) — add a `<button>` in `showRecurrencePrompt()`
-   - File: [main.py](main.py) — add logic to `set_recurrence()` to handle the new frequency
+# 4. Run the local dev server
+python test_local.py
+# → open http://localhost:3000
+```
 
-3. **Customize the chat bubble appearance**
-   - File: [public/style.css](public/style.css#L54-L58) — avatar colors and styles
-   - File: [public/script.js](public/script.js#L760) — renderMessage() HTML structure
+**Try it immediately — no keys needed:**
+- `What is MyVillage Project?` → KB answer with sources
+- `Add Team Meeting on 2026-06-01 from 2pm to 3pm` → calendar event
+- `lesson plans` → student planning flow (uses webhook)
 
-4. **Add a new intent to the chat**
-   - File: [public/script.js](public/script.js#L912) — add condition after `const text = input.value.trim()`
-   - File: [main.py](main.py) — add new tool and call it from the form handler
+### Deploy to Vercel
 
-### Advanced: Replacing In-Memory Storage
+```bash
+npm install -g vercel
+vercel deploy
+# → https://<project>.vercel.app
+```
 
-Currently, all events are stored in a Python list in `main.py`. For production:
+Set environment variables in the Vercel dashboard under **Settings → Environment Variables**.
 
-- Replace `events = []` with a database connection (e.g., PostgreSQL, Redis, DynamoDB)
-- Modify `add_event()`, `get_events()`, `delete_event()`, `set_recurrence()` to use DB operations
-- For Vercel, consider AWS DynamoDB or a managed database service
+### Microsoft Calendar OAuth (Optional)
 
-## Development & Contributing
+Set `MS_CLIENT_ID` + `MS_CLIENT_SECRET` in your environment. The **Connect to MyVillage Project Account** button will:
+1. Call `GET /api/oauth/microsoft/start` → build Microsoft auth URL
+2. Redirect to Microsoft login
+3. Callback at `GET /api/oauth/microsoft/callback` → exchange code, fetch display name
+4. Show `Connected: <name>` in the chat header
 
-If you plan to edit or extend this project, see `DEVELOPING.md` for a detailed developer guide (setup, editing the frontend and backend, testing, and deployment to Vercel).
+Without these vars the button falls back to `redirect_microsoft.html`.
 
+---
 
-Contributions should follow the branch-per-feature workflow and include clear commit messages (use prefixes like `feat:`, `fix:`, `style:`, or `docs:`). Please open a PR for review and testing before merging to the main branch.
+## Project Structure
 
-## Editing & Customization
+```
+├── main.py                   # MCP tools + FastAPI app
+├── api/
+│   ├── app.py                # Vercel ASGI entrypoint
+│   └── mcp.py                # Serverless handler for /api/mcp
+├── data/
+│   └── knowledge_base.json   # RAG document store (10 program docs)
+├── public/
+│   ├── index.html            # Chat UI
+│   ├── script.js             # Intent routing, RAG rendering, planning flows
+│   └── style.css             # UI styles (incl. RAG source chips)
+├── requirements.txt
+└── vercel.json
+```
 
-### Theme, Colors & Avatars
+---
 
-- **Theme / colors**: color variables live at the top of [public/style.css](public/style.css#L1). Change `--bg`, `--panel-bg`, `--text`, `--accent`, and `--send` to tune the palette.
-- **Avatars**: avatar styles are in [public/style.css](public/style.css#L1) under `.message .avatar`. User avatar is 🌞, bot avatar is ⭐. Edit `color`, `background`, or `border-radius` to customize.
+## Editor Guide
 
-### Buttons (UI)
+### Adding a new KB document
 
-- **Sign-in / Connect buttons**: in [public/index.html](public/index.html#L1), the header contains authentication buttons:
-  - `#signinGoogle` and `#signinMicrosoft` (currently test buttons)
-  - Change label text or classes directly in HTML
-  - To restore real OAuth, change click handlers in [public/script.js](public/script.js) to call `startOauth(provider)`
+Append to [`data/knowledge_base.json`](data/knowledge_base.json):
 
-### Redirect Pages (OAuth Fallback)
+```json
+{
+  "id": "unique-slug",
+  "title": "Document Title",
+  "source": "Section Reference",
+  "content": "Full document text here..."
+}
+```
 
-- **Microsoft redirect**: [public/redirect_microsoft.html](public/redirect_microsoft.html) — dev fallback when OAuth is not configured
-- **Google redirect**: [public/redirect_google.html](public/redirect_google.html) — similar fallback
-- Edit the URL or meta-refresh delay as needed
+No code changes needed — the retriever loads all documents at import time.
+
+### Adding a new chat intent
+
+1. **Frontend** ([public/script.js](public/script.js)) — add a `looksLike*()` function and a `submit*()` handler, then wire them into the form submit block
+2. **Backend** ([main.py](main.py)) — add a `@mcp.tool()` decorated function
+
+### Key functions
+
+| File | Function | Purpose |
+|---|---|---|
+| [main.py](main.py) | `_retrieve_chunks(query, top_k)` | TF-IDF cosine similarity retrieval |
+| [main.py](main.py) | `ask_knowledge_base(query)` | RAG tool: retrieve + LLM synthesize |
+| [main.py](main.py) | `search_knowledge_base(query)` | Raw chunk retrieval tool |
+| [main.py](main.py) | `handle_message(message)` | Calendar command parser + RAG router |
+| [main.py](main.py) | `personalized_lesson_plans(...)` | Student data + LLM lesson plans |
+| [public/script.js](public/script.js) | `submitKnowledgeBaseQuery(text)` | Frontend RAG call + render |
+| [public/script.js](public/script.js) | `renderRagResponse(answer, sources, rag)` | Renders answer with source chips |
+| [public/script.js](public/script.js) | `submitPersonalizedLessonPlans(text)` | Multi-step student planning flow |
+
+### Replacing in-memory event storage
+
+Events are stored in a Python list and reset on every cold start. For production:
+
+- Replace `events: List[Dict] = []` with a DB connection (PostgreSQL, Redis, DynamoDB)
+- Update `add_event()`, `view_events()`, `delete_event()`, and `set_recurrence()` to use DB ops
+- On Vercel, AWS DynamoDB or a managed Postgres (Neon, Supabase) works well
+
+---
+
+## Contributing
+
+Branch per feature. Commit prefixes: `feat:` · `fix:` · `style:` · `docs:` · `refactor:`. Open a PR before merging to `main`.
+
+See [`DEVELOPING.md`](DEVELOPING.md) for a full developer guide.
