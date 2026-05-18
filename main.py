@@ -1049,7 +1049,7 @@ def handle_message(message: str) -> str:
     "- \"Summarize upcoming\"\n"
     "- \"Delete Birthday\"\n"
     "- \"Plan\" to start project planning\n"
-    "- \"What is MyVillage Project?\" to search the knowledge base\n"
+    "- \"What is The Academy?\" to search the knowledge base\n"
   )
 
 
@@ -1142,7 +1142,7 @@ def _retrieve_chunks(query: str, top_k: int = 3) -> List[Dict]:
 
 @mcp.tool()
 def search_knowledge_base(query: str, top_k: int = 3) -> dict:
-  """Search the MyVillage Project knowledge base and return relevant document chunks.
+  """Search The Academy knowledge base and return relevant document chunks.
 
   Uses TF-IDF cosine similarity to rank documents by relevance to the query.
   Returns up to top_k chunks with their titles and source references.
@@ -1216,7 +1216,7 @@ def ask_knowledge_base(query: str, top_k: int = 3) -> dict:
   llm_key = os.getenv("LLM_API_KEY")
   if llm_key:
     prompt = (
-      "You are a helpful assistant for the MyVillage Project educational program. "
+      "You are a helpful assistant for The Academy educational program. "
       "Use ONLY the context documents below to answer the question. "
       "Be concise and accurate. If the context does not contain enough information to fully answer, "
       "say so rather than guessing.\n\n"

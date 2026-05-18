@@ -622,13 +622,13 @@ function showStudentCalendarActions(result, flowOptions = {}) {
 async function startMvpStudentPlanningFlow() {
   const projectGoal = prompt('Describe the project goal for these students (used to personalize lesson plans):');
   if (projectGoal === null || !projectGoal.trim()) {
-    addLocalMessage('MVP planning cancelled (project goal is required).', 'bot');
+    addLocalMessage('Planning cancelled (project goal is required).', 'bot');
     return;
   }
 
   const deadlineInput = prompt('Optional: target date for the project (YYYY-MM-DD). Leave blank to skip.', '');
   if (deadlineInput === null) {
-    addLocalMessage('MVP planning cancelled.', 'bot');
+    addLocalMessage('Planning cancelled.', 'bot');
     return;
   }
   const deadline = String(deadlineInput || '').trim();
@@ -656,7 +656,7 @@ async function startMvpStudentPlanningFlow() {
 
     const selectedStudents = await showStudentButtonSelector(
       studentNames,
-      'MVP student planning: select one or more students to generate lesson plans',
+      'Student planning: select one or more students to generate lesson plans',
       { multiSelect: true, confirmLabel: 'Generate Plans for Selected Students' }
     );
     if (!selectedStudents || !selectedStudents.length) {
@@ -686,7 +686,7 @@ async function startMvpStudentPlanningFlow() {
     );
   } catch (err) {
     removeTyping();
-    addLocalMessage('Unable to start MVP student planning: ' + err.message, 'bot');
+    addLocalMessage('Unable to start student planning: ' + err.message, 'bot');
   } finally {
     setFetching(false);
   }
@@ -809,7 +809,7 @@ load();
 if (chat.length){
   chat.forEach(renderMessage);
 } else {
-  const welcomeMsg = `Welcome to the MVP Calendar Workspace.\n\n• Ask a question — e.g. "What is MyVillage Project?" or "How does enrollment work?" — to search the knowledge base.\n• Say "lesson plans" to generate personalized student plans.\n• Add, list, or delete calendar events with natural language.`;
+  const welcomeMsg = `Welcome to The Academy Workspace.\n\n• Ask a question — e.g. "What is The Academy?" or "How does enrollment work?" — to search the knowledge base.\n• Say "lesson plans" to generate personalized student plans.\n• Add, list, or delete calendar events with natural language.`;
   addLocalMessage(welcomeMsg, 'bot');
   messages.scrollTop = messages.scrollHeight;
 }
@@ -855,16 +855,16 @@ window.addEventListener('load', ()=> input.focus());
       const { data, text } = await parseJsonSafe(resp);
       const authUrl = data?.auth_url;
       if (resp.ok && authUrl) {
-        addLocalMessage('Opening MyVillage Project Account sign-in...', 'bot');
+        addLocalMessage('Opening Academy Account sign-in...', 'bot');
         window.location.href = authUrl;
         return;
       }
 
       // Local/dev fallback so button still behaves even before env vars are configured.
-      addLocalMessage('MyVillage Project Account sign-in is not configured yet. Opening fallback page.', 'bot');
+      addLocalMessage('Academy Account sign-in is not configured yet. Opening fallback page.', 'bot');
       window.location.href = '/redirect_microsoft.html';
     } catch (err) {
-      addLocalMessage('Could not start MyVillage Project Account connect flow. Using fallback page.', 'bot');
+      addLocalMessage('Could not start Academy Account connect flow. Using fallback page.', 'bot');
       window.location.href = '/redirect_microsoft.html';
     }
   }
@@ -900,7 +900,7 @@ function clearConversation(){
   chat = [];
   save();
   messages.innerHTML = '';
-  const welcomeMsg = `Welcome to the MVP Calendar Workspace.\n\n• Ask a question — e.g. "What is MyVillage Project?" or "How does enrollment work?" — to search the knowledge base.\n• Say "lesson plans" to generate personalized student plans.\n• Add, list, or delete calendar events with natural language.`;
+  const welcomeMsg = `Welcome to The Academy Workspace.\n\n• Ask a question — e.g. "What is The Academy?" or "How does enrollment work?" — to search the knowledge base.\n• Say "lesson plans" to generate personalized student plans.\n• Add, list, or delete calendar events with natural language.`;
   addLocalMessage(welcomeMsg, 'bot');
   syncQuickActions();
 }
@@ -1211,7 +1211,7 @@ function triggerCardAction(action) {
 
   } else if (action === 'knowledge-base') {
     const suggestions = [
-      'What is MyVillage Project?',
+      'What is The Academy?',
       'How does enrollment work?',
       'What are coaches responsible for?',
       'How does the AI planning assistant work?',
