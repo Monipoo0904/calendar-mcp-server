@@ -989,6 +989,70 @@ async function submitKnowledgeBaseQuery(text) {
   }
 }
 
+/*
+Student picker flow (selectStudentsAndGeneratePlans)
+- Called instead of submitPersonalizedLessonPlans when a student plan is requested.
+- If the user already named students ("lesson plans for Alice") it goes straight to plan
+  generation.
+- If no names are given it fetches the student directory, shows a multi-select picker
+  in the chat, then generates plans for only the chosen students.
+- preselectedStudents is forwarded to showStudentCalendarActions so the calendar
+  create button already knows which students were selected.
+*/
+async function selectStudentsAndGeneratePlans(userText) {
+  const requestedNames = extractRequestedStudentNames(userText);
+
+  if (requestedNames) {
+    // User already named someone — skip picker and generate directly
+    removeTyping();
+    await submitPersonalizedLessonPlans(userText);
+    return;
+  }
+
+  // No student named — fetch directory and show in-chat picker
+  let directory;
+  try {
+    directory = await fetchStudentDirectory();
+  } catch (err) {
+    removeTyping();
+    addLocalMessage('Could not load the student list: ' + err.message, 'bot');
+    return;
+  }
+
+  const studentNames = Array.isArray(directory?.available_students)
+    ? directory.available_students
+    : [];
+
+  removeTyping();
+
+  if (!studentNames.length) {
+    addLocalMessage(
+      'No students found in the skills database. Check the webhook configuration.',
+      'bot'
+    );
+    return;
+  }
+
+  const selected = await showStudentButtonSelector(
+    studentNames,
+    `Select one or more students to generate lesson plans for (${studentNames.length} available)`,
+    { multiSelect: true, confirmLabel: 'Generate Plans' }
+  );
+
+  if (!selected || !selected.length) {
+    addLocalMessage('No students selected — cancelled.', 'bot');
+    return;
+  }
+
+  const csv = selected.join(', ');
+  addLocalMessage(`Generating personalized lesson plans for: ${csv}`, 'bot');
+  showTyping();
+  await submitPersonalizedLessonPlans(`lesson plans for ${csv}`, {
+    preselectedStudents: selected,
+  });
+  removeTyping();
+}
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   const text = input.value.trim();
@@ -1002,8 +1066,7 @@ form.addEventListener('submit', async (e) => {
 
   try {
     if (looksLikeStudentPlanRequest(text)) {
-      removeTyping();
-      await submitPersonalizedLessonPlans(text);
+      await selectStudentsAndGeneratePlans(text);
       return;
     }
 
