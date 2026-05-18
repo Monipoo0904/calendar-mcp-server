@@ -1,7 +1,7 @@
 from mcp.server.fastmcp import FastMCP 
 from typing import List, Dict 
 from datetime import datetime 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import JSONResponse, Response, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -505,7 +505,7 @@ def personalized_lesson_plans(students: str = "", lesson_goal: str = "", max_stu
   except Exception:
     max_n = 10
 
-  use_demo = os.getenv("DEMO_STUDENTS", "").strip().lower() in ("1", "true", "yes")
+  use_demo = os.getenv("DEMO_STUDENTS", "true").strip().lower() in ("1", "true", "yes")
 
   if use_demo:
     rows = _DEMO_STUDENT_ROWS
@@ -1447,7 +1447,89 @@ async def oauth_microsoft_callback(request: Request):
     return RedirectResponse(url=f"{app_redirect}?ms_error=oauth_callback_exception&ms_provider=microsoft", status_code=302)
 
 
-@app.get("/export.ics", include_in_schema=False)
+@app.get("/api/oauth/google/start", include_in_schema=False)
+async def oauth_google_start(request: Request):
+  client_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+  if not client_id:
+    return RedirectResponse("/redirect_google.html", status_code=302)
+  base = str(request.base_url).rstrip("/")
+  redirect_uri = os.getenv("GOOGLE_REDIRECT_URI", "").strip() or f"{base}/api/oauth/google/callback"
+  params = urlencode({
+    "client_id": client_id,
+    "redirect_uri": redirect_uri,
+    "response_type": "code",
+    "scope": "openid email profile",
+    "access_type": "offline",
+    "state": secrets.token_urlsafe(16),
+  })
+  return RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{params}", status_code=302)
+
+
+@app.get("/api/oauth/google/callback", include_in_schema=False)
+async def oauth_google_callback(request: Request):
+  app_redirect = str(request.base_url).rstrip("/")
+  code = request.query_params.get("code", "")
+  error = request.query_params.get("error", "")
+  if error or not code:
+    return RedirectResponse(f"{app_redirect}?g_error=access_denied", status_code=302)
+  try:
+    client_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
+    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI", "").strip() or f"{app_redirect}/api/oauth/google/callback"
+    token_resp = httpx.post(
+      "https://oauth2.googleapis.com/token",
+      data={
+        "code": code,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
+      },
+      timeout=20.0,
+    )
+    if token_resp.status_code != 200:
+      return RedirectResponse(f"{app_redirect}?g_error=token_exchange_failed", status_code=302)
+    access_token = token_resp.json().get("access_token", "")
+    if not access_token:
+      return RedirectResponse(f"{app_redirect}?g_error=missing_access_token", status_code=302)
+    profile_resp = httpx.get(
+      "https://www.googleapis.com/oauth2/v2/userinfo",
+      headers={"Authorization": f"Bearer {access_token}"},
+      timeout=20.0,
+    )
+    if profile_resp.status_code != 200:
+      return RedirectResponse(f"{app_redirect}?g_error=profile_fetch_failed", status_code=302)
+    profile = profile_resp.json()
+    display_name = profile.get("name") or profile.get("given_name") or "Google User"
+    email = profile.get("email", "")
+    qs = urlencode({"g_name": display_name, "g_email": email, "g_connected": "1"})
+    return RedirectResponse(f"{app_redirect}?{qs}", status_code=302)
+  except Exception:
+    return RedirectResponse(f"{app_redirect}?g_error=oauth_callback_exception", status_code=302)
+
+
+@app.post("/api/upload", include_in_schema=False)
+async def upload_document(file: UploadFile = File(...)):
+  """Accept a document upload and add it to the in-memory knowledge base."""
+  allowed_types = {
+    "text/plain", "text/markdown", "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  }
+  if file.content_type not in allowed_types and not file.filename.endswith((".txt", ".md")):
+    return {"ok": False, "error": "Unsupported file type"}
+  content_bytes = await file.read()
+  try:
+    text = content_bytes.decode("utf-8", errors="replace")
+  except Exception:
+    return {"ok": False, "error": "Could not read file"}
+  doc = {
+    "title": file.filename or "Uploaded Document",
+    "source": "upload",
+    "content": text[:20000],
+  }
+  _KB_DOCS.append(doc)
+  return {"ok": True, "title": doc["title"]}
 async def export_ics(request: Request):
   """Generate a simple iCalendar (.ics) file from in-memory `events`.
 

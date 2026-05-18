@@ -27,6 +27,10 @@ const clearBtn = document.getElementById('clearBtn');
 const clearBtnTop = document.getElementById('clearBtnTop');
 const connectedUserNameEl = document.getElementById('connectedUserName');
 
+// ── Avatar SVG constants ──
+const _BOT_AV = '<div class="avatar bot-avatar"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>';
+const _USER_AV = '<div class="avatar user-avatar"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2.5"/></svg></div>';
+
 let chat = [] // persisted messages
 let typingEl = null
 
@@ -173,7 +177,7 @@ function showIcsExportButton(message = 'Ready to export your calendar file?', mi
   const actionEl = document.createElement('div');
   actionEl.className = 'message bot';
   actionEl.innerHTML = `
-    <div class="avatar">⭐</div>
+    ${_BOT_AV}
     <div class="bubble">
       <div class="text">${escapeHtml(message)}</div>
       <div class="export-scope-label">Export scope: ${escapeHtml(defaultScope)}</div>
@@ -366,7 +370,7 @@ function showStudentButtonSelector(students, title = 'Select a student', options
     const pickerEl = document.createElement('div');
     pickerEl.className = 'message bot';
     pickerEl.innerHTML = `
-      <div class="avatar">⭐</div>
+      ${_BOT_AV}
       <div class="bubble">
         <div class="text">${escapeHtml(title)} (scroll to find the right name):</div>
         <div class="meta" style="margin-top:8px; display:block;">
@@ -514,7 +518,7 @@ function showStudentCalendarActions(result, flowOptions = {}) {
   const actionEl = document.createElement('div');
   actionEl.className = 'message bot';
   actionEl.innerHTML = `
-    <div class="avatar">⭐</div>
+    ${_BOT_AV}
     <div class="bubble">
       <div class="text">Ready to schedule selected student lesson sessions?</div>
       <div class="meta" style="margin-top:8px;">
@@ -735,7 +739,7 @@ function renderMessage(msg){
   const el = document.createElement('div');
   el.className = 'message ' + (msg.who === 'user' ? 'user' : 'bot') + ' enter';
   el.innerHTML = `
-    <div class="avatar">${msg.who === 'user' ? '🌞' : '⭐'}</div>
+    ${msg.who === 'user' ? _USER_AV : _BOT_AV}
     <div class="bubble">
       <div class="text">${escapeHtml(msg.text)}</div>
       <div class="meta">
@@ -745,7 +749,6 @@ function renderMessage(msg){
     </div>
   `;
   messages.appendChild(el);
-  // trigger enter animation
   requestAnimationFrame(()=> el.classList.remove('enter'));
   messages.scrollTop = messages.scrollHeight;
 }
@@ -755,6 +758,7 @@ function addLocalMessage(text, who='user'){
   chat.push(m);
   save();
   renderMessage(m);
+  if (who === 'user') syncQuickActions();
 }
 
 function showTyping(){
@@ -762,7 +766,7 @@ function showTyping(){
   typingEl = document.createElement('div');
   typingEl.className = 'message bot typing';
   typingEl.innerHTML = `
-    <div class="avatar">⭐</div>
+    ${_BOT_AV}
     <div class="bubble"><div class="dots"><span></span><span></span><span></span></div></div>
   `;
   messages.appendChild(typingEl);
@@ -898,9 +902,116 @@ function clearConversation(){
   messages.innerHTML = '';
   const welcomeMsg = `Welcome to the MVP Calendar Workspace.\n\n• Ask a question — e.g. "What is MyVillage Project?" or "How does enrollment work?" — to search the knowledge base.\n• Say "lesson plans" to generate personalized student plans.\n• Add, list, or delete calendar events with natural language.`;
   addLocalMessage(welcomeMsg, 'bot');
+  syncQuickActions();
 }
 clearBtn?.addEventListener('click', clearConversation);
 clearBtnTop?.addEventListener('click', clearConversation);
+
+// ── Tab switching ─────────────────────────
+document.querySelectorAll('.nav-item[data-tab]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.nav-item[data-tab]').forEach(b => {
+      b.classList.toggle('is-active', b === btn);
+      b.removeAttribute('aria-current');
+    });
+    btn.setAttribute('aria-current', 'page');
+    document.querySelectorAll('.tab-panel').forEach(p =>
+      p.classList.toggle('is-active', p.id === `tab-${tab}`)
+    );
+  });
+});
+
+// ── Quick-actions visibility ──────────────
+function syncQuickActions() {
+  const qa = document.getElementById('quickActions');
+  if (!qa) return;
+  qa.style.display = chat.some(m => m.who === 'user') ? 'none' : '';
+}
+syncQuickActions();
+
+// ── Document upload ───────────────────────
+(function initUpload() {
+  const uploadZone = document.getElementById('uploadZone');
+  const fileInput  = document.getElementById('fileInput');
+  const uploadedList = document.getElementById('uploadedList');
+  if (!uploadZone || !fileInput || !uploadedList) return;
+
+  uploadZone.addEventListener('click', () => fileInput.click());
+  uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('drag-over');
+    handleFiles(Array.from(e.dataTransfer.files));
+  });
+  fileInput.addEventListener('change', () => {
+    handleFiles(Array.from(fileInput.files));
+    fileInput.value = '';
+  });
+
+  function handleFiles(files) {
+    files.forEach(file => {
+      const item = document.createElement('div');
+      item.className = 'upload-file-item';
+      item.innerHTML = `
+        <span class="file-name">${escapeHtml(file.name)}</span>
+        <span class="file-size">${formatFileSize(file.size)}</span>
+        <span class="file-status uploading">Uploading…</span>
+      `;
+      uploadedList.prepend(item);
+      const statusEl = item.querySelector('.file-status');
+
+      const data = new FormData();
+      data.append('file', file);
+      fetch('/api/upload', { method: 'POST', body: data })
+        .then(r => r.json())
+        .then(json => {
+          statusEl.textContent = json.ok ? 'Saved' : 'Failed';
+          statusEl.className = 'file-status ' + (json.ok ? 'done' : 'error');
+        })
+        .catch(() => {
+          statusEl.textContent = 'Error';
+          statusEl.className = 'file-status error';
+        });
+    });
+  }
+
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+})();
+
+// ── Google sign-in ────────────────────────
+async function startGoogleSignIn() {
+  try {
+    const res = await fetch('/api/oauth/google/start');
+    if (res.redirected) { window.location.href = res.url; return; }
+    if (res.ok) { const j = await res.json(); if (j.url) { window.location.href = j.url; return; } }
+    window.location.href = '/redirect_google.html';
+  } catch {
+    window.location.href = '/redirect_google.html';
+  }
+}
+
+function hydrateGoogleIdentityFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const name = params.get('g_name');
+  const email = params.get('g_email');
+  if (!name) return;
+  if (connectedUserNameEl) connectedUserNameEl.textContent = name;
+  const gBtn = document.getElementById('signinGoogle');
+  if (gBtn) { gBtn.textContent = email || name; gBtn.disabled = true; }
+  const clean = new URL(window.location);
+  clean.searchParams.delete('g_name');
+  clean.searchParams.delete('g_email');
+  window.history.replaceState({}, '', clean);
+}
+
+document.getElementById('signinGoogle')?.addEventListener('click', startGoogleSignIn);
+hydrateGoogleIdentityFromUrl();
 
 // Keyboard: Enter to send, Shift+Enter for newline
 input.addEventListener('keydown', (e)=>{
@@ -944,7 +1055,7 @@ function renderRagResponse(answer, sources, isRag) {
   }
 
   el.innerHTML = `
-    <div class="avatar">⭐</div>
+    ${_BOT_AV}
     <div class="bubble">
       ${badgeHtml}
       <div class="rag-answer text">${safeAnswer}</div>
@@ -1082,7 +1193,7 @@ function triggerCardAction(action) {
     const promptEl = document.createElement('div');
     promptEl.className = 'message bot';
     promptEl.innerHTML = `
-      <div class="avatar">⭐</div>
+      ${_BOT_AV}
       <div class="bubble">
         <div class="text">What event should repeat? Type the event title below and I'll help you set a cadence.</div>
         <div class="meta" style="margin-top:8px;">
@@ -1109,7 +1220,7 @@ function triggerCardAction(action) {
     const promptEl = document.createElement('div');
     promptEl.className = 'message bot';
     promptEl.innerHTML = `
-      <div class="avatar">⭐</div>
+      ${_BOT_AV}
       <div class="bubble">
         <div class="text">Ask anything about the program. Here are some questions to get you started:</div>
         <div class="meta" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;">
@@ -1194,7 +1305,7 @@ function showRecurrencePrompt(title){
   const promptEl = document.createElement('div');
   promptEl.className = 'message bot';
   promptEl.innerHTML = `
-    <div class="avatar">⭐</div>
+    ${_BOT_AV}
     <div class="bubble">
       <div class="text">Would you like reminders for "<strong>${escapeHtml(title)}</strong>"?</div>
       <div class="meta" style="margin-top:8px; gap:6px;">
@@ -1331,7 +1442,7 @@ async function submitProjectGoal(goalText) {
       const actionEl = document.createElement('div');
       actionEl.className = 'message bot';
       actionEl.innerHTML = `
-        <div class="avatar">⭐</div>
+        ${_BOT_AV}
         <div class="bubble">
           <div class="text">Ready to prepare a calendar export for this plan?</div>
           <div class="meta" style="margin-top:8px;">
@@ -1398,7 +1509,7 @@ async function submitProjectGoal(goalText) {
         const confirmEl = document.createElement('div');
         confirmEl.className = 'message bot';
         confirmEl.innerHTML = `
-          <div class="avatar">⭐</div>
+          ${_BOT_AV}
           <div class="bubble">
             <div class="text">Review export settings:\n• Where: ${escapeHtml(exportWhere)}\n• When: ${escapeHtml(exportWhen)}\n• Reminders: ${wantsReminders ? escapeHtml(selectedCadence) : 'none'}</div>
             <div class="meta" style="margin-top:8px;">
