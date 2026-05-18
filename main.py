@@ -58,6 +58,38 @@ STUDENT_SKILLS_WEBHOOK_URL = os.getenv(
   "https://myvillageproject.app.n8n.cloud/webhook/student-skills"
 )
 
+# Demo student roster — used when DEMO_STUDENTS=true or when the webhook is unreachable.
+# Names are intentionally generic so they are safe for screen recordings and presentations.
+_DEMO_STUDENT_ROWS = [
+  {"first name": "Jordan",  "last name": "Rivera",   "check-in": "2026-05-10", "skill": "storytelling"},
+  {"first name": "Jordan",  "last name": "Rivera",   "check-in": "2026-05-03", "skill": "public speaking"},
+  {"first name": "Jordan",  "last name": "Rivera",   "check-in": "2026-04-26", "skill": "creativity"},
+  {"first name": "Morgan",  "last name": "Chen",     "check-in": "2026-05-10", "skill": "coding"},
+  {"first name": "Morgan",  "last name": "Chen",     "check-in": "2026-05-03", "skill": "problem solving"},
+  {"first name": "Morgan",  "last name": "Chen",     "check-in": "2026-04-26", "skill": "coding"},
+  {"first name": "Avery",   "last name": "Thompson", "check-in": "2026-05-10", "skill": "design"},
+  {"first name": "Avery",   "last name": "Thompson", "check-in": "2026-05-03", "skill": "creativity"},
+  {"first name": "Avery",   "last name": "Thompson", "check-in": "2026-04-26", "skill": "design"},
+  {"first name": "Casey",   "last name": "Williams", "check-in": "2026-05-10", "skill": "math"},
+  {"first name": "Casey",   "last name": "Williams", "check-in": "2026-05-03", "skill": "analysis"},
+  {"first name": "Casey",   "last name": "Williams", "check-in": "2026-04-26", "skill": "research"},
+  {"first name": "Riley",   "last name": "Johnson",  "check-in": "2026-05-10", "skill": "leadership"},
+  {"first name": "Riley",   "last name": "Johnson",  "check-in": "2026-05-03", "skill": "collaboration"},
+  {"first name": "Riley",   "last name": "Johnson",  "check-in": "2026-04-26", "skill": "communication"},
+  {"first name": "Alex",    "last name": "Patel",    "check-in": "2026-05-10", "skill": "engineering"},
+  {"first name": "Alex",    "last name": "Patel",    "check-in": "2026-05-03", "skill": "coding"},
+  {"first name": "Alex",    "last name": "Patel",    "check-in": "2026-04-26", "skill": "problem solving"},
+  {"first name": "Taylor",  "last name": "Brooks",   "check-in": "2026-05-10", "skill": "writing"},
+  {"first name": "Taylor",  "last name": "Brooks",   "check-in": "2026-05-03", "skill": "research"},
+  {"first name": "Taylor",  "last name": "Brooks",   "check-in": "2026-04-26", "skill": "communication"},
+  {"first name": "Sam",     "last name": "Nguyen",   "check-in": "2026-05-10", "skill": "video editing"},
+  {"first name": "Sam",     "last name": "Nguyen",   "check-in": "2026-05-03", "skill": "creativity"},
+  {"first name": "Sam",     "last name": "Nguyen",   "check-in": "2026-04-26", "skill": "storytelling"},
+  {"first name": "Drew",    "last name": "Martinez", "check-in": "2026-05-10", "skill": "organization"},
+  {"first name": "Drew",    "last name": "Martinez", "check-in": "2026-05-03", "skill": "planning"},
+  {"first name": "Drew",    "last name": "Martinez", "check-in": "2026-04-26", "skill": "leadership"},
+]
+
 
 def _normalize_skill_row(row: dict) -> dict:
   """Map webhook row variants into a consistent student-skill shape.
@@ -473,21 +505,23 @@ def personalized_lesson_plans(students: str = "", lesson_goal: str = "", max_stu
   except Exception:
     max_n = 10
 
-  try:
-    resp = httpx.get(STUDENT_SKILLS_WEBHOOK_URL, timeout=15.0)
-    if resp.status_code != 200:
-      return {
-        "error": f"Failed to fetch student skills (status {resp.status_code}).",
-        "webhook_url": STUDENT_SKILLS_WEBHOOK_URL,
-      }
-    payload = resp.json()
-  except Exception as e:
-    return {
-      "error": f"Unable to fetch student skills: {e}",
-      "webhook_url": STUDENT_SKILLS_WEBHOOK_URL,
-    }
+  use_demo = os.getenv("DEMO_STUDENTS", "").strip().lower() in ("1", "true", "yes")
 
-  rows = _extract_rows_from_webhook_payload(payload)
+  if use_demo:
+    rows = _DEMO_STUDENT_ROWS
+  else:
+    try:
+      resp = httpx.get(STUDENT_SKILLS_WEBHOOK_URL, timeout=15.0)
+      if resp.status_code != 200:
+        rows = _DEMO_STUDENT_ROWS  # fallback to demo on HTTP error
+      else:
+        payload = resp.json()
+        rows = _extract_rows_from_webhook_payload(payload)
+        if not rows:
+          rows = _DEMO_STUDENT_ROWS  # fallback when webhook returns empty
+    except Exception:
+      rows = _DEMO_STUDENT_ROWS  # fallback when webhook is unreachable
+
   students_index = _build_student_strength_index(rows)
   if not students_index:
     return {

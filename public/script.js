@@ -1053,6 +1053,98 @@ async function selectStudentsAndGeneratePlans(userText) {
   removeTyping();
 }
 
+/*
+Path card actions
+- Each .path-card has a data-action attribute that maps to a chat action.
+- Clicking a card scrolls to the chat, focuses the input or triggers a flow directly.
+- Keyboard: Enter / Space on focused card triggers the same action.
+*/
+function triggerCardAction(action) {
+  // Scroll chat into view
+  document.querySelector('.chat')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  if (action === 'student-plans') {
+    addLocalMessage('Create student plans', 'user');
+    setFetching(true);
+    showTyping();
+    selectStudentsAndGeneratePlans('lesson plans').finally(() => setFetching(false));
+
+  } else if (action === 'export') {
+    addLocalMessage('Export calendar invites by person', 'user');
+    showIcsExportButton('Choose how to export your calendar invites:', null, {});
+
+  } else if (action === 'connect-calendars') {
+    addLocalMessage('Connect calendars', 'user');
+    startMicrosoftCalendarConnect();
+
+  } else if (action === 'recurrence') {
+    addLocalMessage('Build a recurring cadence', 'user');
+    const promptEl = document.createElement('div');
+    promptEl.className = 'message bot';
+    promptEl.innerHTML = `
+      <div class="avatar">⭐</div>
+      <div class="bubble">
+        <div class="text">What event should repeat? Type the event title below and I'll help you set a cadence.</div>
+        <div class="meta" style="margin-top:8px;">
+          <button class="copy recurrence-start-btn plan-primary-btn">Set recurrence for an event</button>
+        </div>
+      </div>
+    `;
+    messages.appendChild(promptEl);
+    messages.scrollTop = messages.scrollHeight;
+    promptEl.querySelector('.recurrence-start-btn')?.addEventListener('click', () => {
+      promptEl.remove();
+      input.placeholder = 'Type an event title to set its recurrence...';
+      input.focus();
+    });
+
+  } else if (action === 'knowledge-base') {
+    const suggestions = [
+      'What is MyVillage Project?',
+      'How does enrollment work?',
+      'What are coaches responsible for?',
+      'How does the AI planning assistant work?',
+      'What do students present at the capstone?',
+    ];
+    const promptEl = document.createElement('div');
+    promptEl.className = 'message bot';
+    promptEl.innerHTML = `
+      <div class="avatar">⭐</div>
+      <div class="bubble">
+        <div class="text">Ask anything about the program. Here are some questions to get you started:</div>
+        <div class="meta" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;">
+          ${suggestions.map((q) => `<button class="copy kb-suggestion-btn" style="text-align:left;">${escapeHtml(q)}</button>`).join('')}
+        </div>
+      </div>
+    `;
+    messages.appendChild(promptEl);
+    messages.scrollTop = messages.scrollHeight;
+    promptEl.querySelectorAll('.kb-suggestion-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const q = btn.textContent || '';
+        promptEl.remove();
+        addLocalMessage(q, 'user');
+        setFetching(true);
+        showTyping();
+        await submitKnowledgeBaseQuery(q);
+        setFetching(false);
+      });
+    });
+    input.placeholder = 'Ask a question about the program...';
+    input.focus();
+  }
+}
+
+document.querySelectorAll('.path-card[data-action]').forEach((card) => {
+  card.addEventListener('click', () => triggerCardAction(card.dataset.action));
+  card.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      triggerCardAction(card.dataset.action);
+    }
+  });
+});
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   const text = input.value.trim();

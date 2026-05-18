@@ -148,11 +148,31 @@ body {
   border-radius: 12px;
   padding: 14px;
   transition: transform 180ms ease, box-shadow 180ms ease;
+  cursor: pointer;
+  user-select: none;
 }
 
 .path-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 12px 22px rgba(72, 48, 31, 0.16);
+}
+
+.path-card:active {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(72, 48, 31, 0.12);
+}
+
+.card-arrow {
+  font-style: normal;
+  opacity: 0;
+  transition: opacity 140ms ease, transform 140ms ease;
+  display: inline-block;
+  transform: translateX(-4px);
+}
+
+.path-card:hover .card-arrow {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .path-card h3 {
