@@ -1,0 +1,9 @@
+{
+  "name": "mvp-calendar-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": ".venv/bin/uvicorn main:app --reload --port 3000",
+    "start": ".venv/bin/uvicorn main:app --port 3000"
+  }
+}
