@@ -234,6 +234,10 @@ function looksLikeStudentPlanRequest(text) {
   return /lesson\s*plans?|student\s*plans?|student\s*skills?|strengths?|personalized\s*lesson/i.test(text || '');
 }
 
+function looksLikeKnowledgeBaseQuery(text) {
+  return /\b(what\s+is|what\s+are|how\s+does|how\s+do|how\s+many|tell\s+me\s+about|explain|who\s+can|when\s+does|where\s+(is|are)|describe|information\s+about|info\s+on|ask|search\s+(the\s+)?knowledge|lookup|look\s+up)\b/i.test(text || '');
+}
+
 function extractRequestedStudentNames(text) {
   const m = String(text || '').match(/\bfor\s+(.+)$/i);
   if (!m) return '';
@@ -801,7 +805,7 @@ load();
 if (chat.length){
   chat.forEach(renderMessage);
 } else {
-  const welcomeMsg = `What would you like to accomplish? (Describe your goal and I'll help you plan it out.)`;
+  const welcomeMsg = `Welcome to the MVP Calendar Workspace.\n\n• Ask a question — e.g. "What is MyVillage Project?" or "How does enrollment work?" — to search the knowledge base.\n• Say "lesson plans" to generate personalized student plans.\n• Add, list, or delete calendar events with natural language.`;
   addLocalMessage(welcomeMsg, 'bot');
   messages.scrollTop = messages.scrollHeight;
 }
@@ -892,8 +896,7 @@ function clearConversation(){
   chat = [];
   save();
   messages.innerHTML = '';
-  // Re-show welcome message with planning trigger
-  const welcomeMsg = `What would you like to accomplish? (Describe your goal and I'll help you plan it out.)`;
+  const welcomeMsg = `Welcome to the MVP Calendar Workspace.\n\n• Ask a question — e.g. "What is MyVillage Project?" or "How does enrollment work?" — to search the knowledge base.\n• Say "lesson plans" to generate personalized student plans.\n• Add, list, or delete calendar events with natural language.`;
   addLocalMessage(welcomeMsg, 'bot');
 }
 clearBtn?.addEventListener('click', clearConversation);
@@ -908,6 +911,83 @@ input.addEventListener('keydown', (e)=>{
 });
 
 input.addEventListener('input', autoResize);
+
+/*
+RAG / Knowledge Base flow notes
+- looksLikeKnowledgeBaseQuery() matches common question patterns.
+- submitKnowledgeBaseQuery() calls ask_knowledge_base directly and renders
+  the answer with source chips using renderRagResponse().
+- renderRagResponse() injects a structured bubble with a RAG badge, the
+  synthesized answer, and collapsible source chips — no markdown parsing needed.
+*/
+
+function renderRagResponse(answer, sources, isRag) {
+  const el = document.createElement('div');
+  el.className = 'message bot enter';
+  const safeAnswer = escapeHtml(String(answer || ''));
+  const badgeHtml = isRag
+    ? '<span class="rag-badge">RAG ✦ AI Answer</span>'
+    : '<span class="rag-badge" style="background:rgba(0,0,0,0.25);">Knowledge Base</span>';
+
+  let sourcesHtml = '';
+  if (Array.isArray(sources) && sources.length) {
+    const chips = sources.map((s) => `
+      <span class="rag-source-chip">
+        <span class="chip-title">${escapeHtml(s.title || '')}</span>
+        <span class="chip-source">${escapeHtml(s.source || '')}</span>
+      </span>`).join('');
+    sourcesHtml = `
+      <div class="rag-sources">
+        <span class="rag-sources-label">Sources</span>
+        ${chips}
+      </div>`;
+  }
+
+  el.innerHTML = `
+    <div class="avatar">⭐</div>
+    <div class="bubble">
+      ${badgeHtml}
+      <div class="rag-answer text">${safeAnswer}</div>
+      ${sourcesHtml}
+      <div class="meta">
+        <time>${formatTime(Date.now())}</time>
+        <button class="copy" aria-label="Copy answer">Copy</button>
+      </div>
+    </div>
+  `;
+  messages.appendChild(el);
+  requestAnimationFrame(() => el.classList.remove('enter'));
+  messages.scrollTop = messages.scrollHeight;
+}
+
+async function submitKnowledgeBaseQuery(text) {
+  try {
+    const res = await fetch(getApiUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tool: 'ask_knowledge_base',
+        input: { query: text, top_k: 3 },
+      }),
+    });
+    const { data, text: rawText } = await parseJsonSafe(res);
+    removeTyping();
+    if (res.ok && data?.result) {
+      const result = parseToolObject(data.result);
+      if (typeof result === 'object' && result !== null && result.answer) {
+        renderRagResponse(result.answer, result.sources, result.rag === true);
+        return;
+      }
+      // fallback: plain text result
+      addLocalMessage(typeof result === 'string' ? result : JSON.stringify(result), 'bot');
+      return;
+    }
+    addLocalMessage(`Error (${res.status}): ` + (data?.error || rawText || JSON.stringify(data)), 'bot');
+  } catch (err) {
+    removeTyping();
+    addLocalMessage('Network error: ' + err.message, 'bot');
+  }
+}
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -924,6 +1004,11 @@ form.addEventListener('submit', async (e) => {
     if (looksLikeStudentPlanRequest(text)) {
       removeTyping();
       await submitPersonalizedLessonPlans(text);
+      return;
+    }
+
+    if (looksLikeKnowledgeBaseQuery(text)) {
+      await submitKnowledgeBaseQuery(text);
       return;
     }
 

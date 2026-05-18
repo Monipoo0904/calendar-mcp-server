@@ -3,135 +3,196 @@
 This repository is a Vercel-compatible demo of an MCP-based Event Calendar server.
 
 - API endpoint: `/api/mcp`
-- Frontend: `public/index.html` (simple chat UI)
+- Frontend: `public/index.html` (conversational chat UI)
 
-Quick local test
+## How the Chat Works
 
-1. Install dev deps for local testing:
+The chat uses a **conversational, intent-aware** flow:
+
+### Chat Process Flow
+
+1. **User enters a message** in the composer
+   - Press `Enter` to send, or `Shift+Enter` for a newline
+   - Message is added to the chat and displayed immediately as a user message
+
+2. **Intent detection** — the frontend checks if the message looks like a **student lesson planning** request
+   - If yes → special student planning flow (multi-step, with student selection and personalized goals)
+   - If no → standard **`handle_message`** tool flow (see below)
+
+3. **Standard `handle_message` flow** (for calendar events, queries, and general commands)
+   - Sends the message to the backend tool: `POST /api/mcp` with `{ tool: 'handle_message', input: { message } }`
+   - Shows a typing indicator while waiting
+   - Backend parses the message with natural language support
+   - Backend returns a result (e.g., event added, list of events, error)
+   - Result is displayed as a bot message in the chat
+   - Input is re-enabled
+
+4. **Recurrence prompts** — after adding an event, the UI may show recurrence options
+   - User selects a recurrence type (daily, weekly, custom, etc.)
+   - Sends `set_recurrence` tool call with the selected frequency
+   - Recurrence is stored with the event (in-memory; resets on redeploy)
+
+5. **Export .ics** — after creating events or a plan
+   - An export button is offered in the chat
+   - Click to download a standard iCalendar file (`.ics`)
+   - Optional: export by student or scope (requires `personalized_lesson_plans` tool)
+
+### Supported Commands & Natural Language
+
+The `handle_message` tool understands both **terse commands** and **natural language**:
+
+- **List events**
+  - `list` / `list events` → all events
+  - `list events on 2026-01-01` / `What's on 2026-01-01?` → events for that date
+  - Shorthand: `list:2026-01-01`
+
+- **Add events** (supports times)
+  - `Add Birthday on 2026-02-01` → all-day event
+  - `Add Meeting March 5 about planning` → natural language parsing
+  - `Add Lunch tomorrow` → recognizes `today` / `tomorrow`
+  - `Add Meeting on 2026-02-01 at 14:30` → time-specific event
+  - Shorthand: `add:Title|YYYY-MM-DD|Desc` or `add:Title|YYYY-MM-DD HH:MM|Desc`
+  - Time ranges: `Add Meeting on 2026-02-01 from 3pm to 5pm` → sets both start and end times
+
+- **Delete events**
+  - `delete Meeting` / `remove Birthday` → by title
+  - Shorthand: `delete:Title`
+
+- **Summarize**
+  - `summarize` / `summary` / `what's coming up` → upcoming events overview
+
+- **Help**
+  - If a message isn't understood, the server returns a short help text with examples
+
+### Student Lesson Planning Flow
+
+If the chat detects a message like *"create lesson plans for students"*, it triggers the **student planning flow**:
+
+1. **Fetch available students** from the configured webhook (`STUDENT_SKILLS_WEBHOOK_URL`)
+2. **Multi-select interface** — user picks which students to plan for
+3. **Personalized goals** — for each student, user provides a custom objective
+4. **Generate plans** — backend calls `personalized_lesson_plans` tool
+5. **Create calendar tasks** — user is offered per-student calendar creation
+6. **Export as .ics** — option to export all selected students' milestones as individual `.ics` files
+
+## Local Testing & Development
+
+1. Install dev dependencies:
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-2. Run the test harness:
+2. Run the local test harness:
 
 ```bash
 python test_local.py
 ```
 
-Deploy to Vercel
+3. Open your browser to the printed URL (usually `http://localhost:3000`)
 
-1. Ensure `vercel` CLI is installed and logged in.
-2. Run `vercel deploy` and follow prompts.
-3. Your serverless endpoint will be available at `https://<project>.vercel.app/api/mcp`.
+4. Start adding events! Try:
+   - `Add Birthday on 2026-02-01`
+   - `Add Meeting March 5 about planning`
+   - `Add Lunch tomorrow`
+   - `list` or `what's coming up`
+   - Short form: `add:Meeting|2026-03-01|with team`
 
-Microsoft Outlook connect (top button)
+### Deploy to Vercel
 
-- The header button `Connect to Microsoft Calendar` now calls backend endpoint:
-  - `GET /api/oauth/microsoft/start`
-- This endpoint builds a Microsoft OAuth authorize URL and redirects the browser.
-- OAuth callback endpoint:
-  - `GET /api/oauth/microsoft/callback`
-  - Exchanges authorization code for token, fetches `displayName` from Graph `/me`, then redirects to `index.html` with `ms_name` query param.
-  - Frontend reads `ms_name` and shows `Connected: <name>` in the top-right header.
-- Required environment variable:
-  - `MS_CLIENT_ID` (or `MICROSOFT_CLIENT_ID`)
-- Required for callback token exchange:
-  - `MS_CLIENT_SECRET`
-- Optional environment variables:
-  - `MS_TENANT_ID` (default: `common`)
-  - `MS_REDIRECT_URI` (default: `<base>/api/oauth/microsoft/callback`)
-  - `MS_SCOPES` (default: `offline_access User.Read Calendars.ReadWrite`)
-- If config is missing, frontend falls back to `public/redirect_microsoft.html` so the button still responds in dev.
+1. Ensure `vercel` CLI is installed and logged in: `npm install -g vercel`
+2. Run `vercel deploy` and follow prompts
+3. Your endpoint will be at `https://<project>.vercel.app/api/mcp`
 
-Notes
+### Microsoft Calendar OAuth (Optional)
 
-- Vercel serverless functions are stateless — events are stored in-memory and **will reset** frequently.
-- The demo includes a **conversational** `handle_message` tool that accepts both terse commands and natural language. Examples:
-  - `list` or `list events` → lists all events
-  - `list events on 2026-01-01` or `What's on 2026-01-01?` → lists events for that date
-  - `summarize` / `summary` / `what's coming up` → summary of upcoming events
-  - `add:Title|YYYY-MM-DD|Desc` (shorthand, still supported)
-  - `Add Birthday on 2026-02-01 about cake` → conversational add
-  - `Create Meeting on 2026-03-03` → conversational add
-  - `Add Meeting tomorrow` → supports `today` and `tomorrow`
-  - `delete:Title` or `delete Meeting` or `remove Meeting` → deletes by title
+The demo includes Microsoft Outlook integration. To enable it:
 
-  If a message isn't understood, the handler returns a short help text with examples.
+1. Set environment variables:
+   - `MS_CLIENT_ID` — Azure AD application client ID
+   - `MS_CLIENT_SECRET` — Azure AD application secret
+   - `MS_TENANT_ID` (optional, default: `common`)
+   - `MS_REDIRECT_URI` (optional, default: `<base>/api/oauth/microsoft/callback`)
 
-Time-aware adds
-- To add an event with a specific time use: "Add <Title> on YYYY-MM-DD at HH:MM" (24-hour). Example: "Add Meeting on 2026-02-01 at 14:30".
-- Shorthand with time: `add:Title|YYYY-MM-DD HH:MM|Desc`.
+2. The "Connect to Microsoft Calendar" button will:
+   - Call `GET /api/oauth/microsoft/start` (builds auth URL)
+   - Redirect user to Microsoft login
+   - Callback at `GET /api/oauth/microsoft/callback` exchanges code for token
+   - Frontend displays `Connected: <name>` in the header
 
-Recent changes (developer notes)
-- Time parsing: the chat parser now recognizes date-only and date+time tokens (examples above). It accepts `YYYY-MM-DD`, `YYYY-MM-DD HH:MM`, and `YYYY-MM-DDTHH:MM` (24-hour). Also supports month-name dates with times like "March 5 at 3pm".
-- ICS export: a new endpoint `GET /export.ics` builds a minimal iCalendar file from in-memory events. Events with times produce timed `DTSTART` values; date-only events export as all-day `DTSTART;VALUE=DATE`.
-- End-time ranges & DTEND: the parser now recognizes simple time ranges (e.g. "3pm-5pm", "from 3pm to 5pm") and stores an `end` value for events when present. The `.ics` exporter emits a `DTEND` for such events when possible.
+3. If environment variables are not configured, the button falls back to a dev redirect page (`redirect_microsoft.html`)
 
-Recurrence options (UI + server)
-- New quick recurrence choices shown after creating an event:
-  - No reminders
-  - Every day
-  - Every other day
-  - Weekly
-  - Every two weeks
-  - Weekdays (Mon–Fri)
-  - Monthly (same day each month)
-  - Monthly on day X (prompt asks for day number)
-  - Custom (prompt asks for numeric interval, interpreted as days)
+## Notes
 
-Planning debug notes
-- `create_tasks` requires named input argument `plan`. Client requests must use:
-  - `{"tool":"create_tasks","input":{"plan": <plan_object>}}`
-- The plan action area includes an `Export .ics now` button that downloads `.ics` from `/export.ics`.
-- Student planning exports include an `Export by Student` option and an inline export scope label.
-  - Scope options:
-    - all calendar events (default `Export .ics` button)
-    - all selected students (`/export.ics?students=name1,name2`)
-    - one student (`/export.ics?student=name`)
-- Student lesson milestones now include personalized objective text in event descriptions.
-- Browser planning diagnostics are logged with prefix `[plan-client]`.
-- Server handler diagnostics are logged with prefix `[mcp-handler]`.
-- If task creation fails, compare both logs first to confirm payload shape and tool validation path.
+- Vercel serverless functions are stateless — events are stored in-memory and **will reset** frequently
+- The demo includes a **conversational** `handle_message` tool (see "Supported Commands & Natural Language" above)
+- All MCP tools are exposed via `POST /api/mcp` with shape: `{ tool: 'tool_name', input: { ... } }`
+- Chat messages persist in browser **localStorage** (key: `chat_messages`), so conversations survive page reloads
 
-Where to edit behavior
-- Server recurrence logic: `set_recurrence(title, frequency, interval)` in `main.py`
-  - Simple stepping algorithm used to compute `next_due`.
-  - For production-grade recurrence handling, replace with an RFC5545 RRULE library (python-dateutil rrule) and persist recurrence to DB/KV.
-- Client UI prompt for recurrence choices: `showRecurrencePrompt(title)` in `public/script.js`.
-  - To add/remove options edit the HTML in this function and the handler logic for `monthly_on_day` / `custom` prompts.
+## Backend Tools
 
-Notes
-- Current implementation stores recurrence metadata in-memory events list. Persist to DB/KV for real usage.
-- `monthly_on_day` uses the interval parameter to carry the day-of-month.
+The MCP server exposes these main tools (called from the chat):
 
-Where to edit the code (quick pointers)
-- `main.py` — core tools and parsing:
-  - `add_event(title, date, description)` — validation and storage (now accepts times).
-  - `handle_message(message)` — conversational parser; date detection lives in `find_date_in_msg()` and time normalization in `parse_time_token()`.
-  - `/export.ics` route — builds and returns the .ics file.
-- `public/index.html` — UI: composer, tooltip/examples, auth buttons, `Export .ics` link.
-- `public/script.js` — welcome message, test sign-in handlers, and network calls to `/api/mcp`.
-- `public/style.css` — visual styling for composer, auth buttons, and header controls.
-- `api/mcp.py` — serverless wrapper used for Vercel deployments (keeps CORS handling and tool call shaping).
+- **`handle_message`** — parses a user text message and routes to appropriate action (add event, list, delete, summarize, etc.)
+- **`add_event`** — creates a calendar event (called internally by `handle_message`)
+- **`set_recurrence`** — sets a recurrence pattern on an existing event (called after user clicks recurrence option)
+- **`create_tasks`** — creates a multi-step plan as calendar milestones (called during project planning flow)
+- **`personalized_lesson_plans`** — fetches from webhook and generates student-specific lesson plans
+- **`export_ics`** — generates a `.ics` (iCalendar) file for download
 
-If you plan to extend functionality:
-- Add end-time parsing (DTEND) and update `.ics` generation to include `DTEND`.
-- Add timezone handling (store timezone or convert to UTC); iCalendar events benefit from explicit TZ or UTC timestamps.
-- Add unit tests for `find_date_in_msg()` and `parse_time_token()` to validate parsing edge cases.
+See [main.py](main.py) for tool implementations and [api/mcp.py](api/mcp.py) for the serverless FastAPI wrapper.
 
-Frontend improvements:
+## Editor Guide: Where to Edit Behavior
 
-- Chat UI now supports typing indicator, timestamps, avatars, copy-to-clipboard buttons, Shift+Enter for newlines, Enter to send, and conversation persistence in `localStorage`. The composer shows a spinner while the backend responds and disables input until a reply is received.
+### Chat Parser & Event Logic
 
-Chat redesign notes
-- Core files for UI redesign:
-  - `public/index.html` (layout)
-  - `public/style.css` (visual styling)
-  - `public/script.js` (`renderMessage`, `showTyping`, planner action bindings)
-- Keep planner action class hooks intact (`.create-tasks-btn`, `.export-ics-btn`) unless you also update JS selectors.
-- Preserve accessibility behavior on `#messages` (`role="log"` + `aria-live="polite"`).
-- Re-test plan flow end-to-end after redesign: plan generation → create tasks → export `.ics`.
+- **File**: [main.py](main.py)
+  - **Conversational parsing**: `handle_message(message)` — natural language parsing logic, date/time detection
+  - **Date detection**: `find_date_in_msg(msg)` — extracts dates like "tomorrow", "March 5", "2026-01-01"
+  - **Time normalization**: `parse_time_token(token)` — parses times like "3pm", "14:30", "3pm-5pm"
+  - **Event storage**: `add_event(title, date, description)` — validation and in-memory storage
+  - **Recurrence logic**: `set_recurrence(title, frequency, interval)` — computes next recurrence dates
+
+### Frontend Chat UI
+
+- **File**: [public/script.js](public/script.js)
+  - **Chat input handler**: `form.addEventListener('submit', ...)` (line 912) — intercepts form submission
+  - **Intent detection**: `looksLikeStudentPlanRequest(text)` — regex check for student planning keywords
+  - **Message rendering**: `renderMessage(msg)` — DOM creation for chat bubbles, timestamps, copy buttons
+  - **Message persistence**: `load()` and `save()` — localStorage read/write
+  - **Typing indicator**: `showTyping()` / `removeTyping()` — animated dots while fetching
+  - **Recurrence UI**: `showRecurrencePrompt(title)` — button grid for recurrence choices
+
+- **File**: [public/index.html](public/index.html)
+  - **Chat layout**: `#messages` (role="log", aria-live="polite") — main message container
+  - **Input composer**: `#input` (textarea), `#form` (submit), `#sendBtn` — message input and send button
+  - **Help text**: bottom `p.help` paragraph — shows example commands to users
+
+### Making Common Changes
+
+1. **Edit example commands shown to users**
+   - File: [public/index.html](public/index.html) — edit the `p.help` paragraph at bottom
+   - File: [public/script.js](public/script.js) — edit the welcome message in `addLocalMessage(...)`
+
+2. **Add a new recurrence type**
+   - File: [public/script.js](public/script.js#L950) — add a `<button>` in `showRecurrencePrompt()`
+   - File: [main.py](main.py) — add logic to `set_recurrence()` to handle the new frequency
+
+3. **Customize the chat bubble appearance**
+   - File: [public/style.css](public/style.css#L54-L58) — avatar colors and styles
+   - File: [public/script.js](public/script.js#L760) — renderMessage() HTML structure
+
+4. **Add a new intent to the chat**
+   - File: [public/script.js](public/script.js#L912) — add condition after `const text = input.value.trim()`
+   - File: [main.py](main.py) — add new tool and call it from the form handler
+
+### Advanced: Replacing In-Memory Storage
+
+Currently, all events are stored in a Python list in `main.py`. For production:
+
+- Replace `events = []` with a database connection (e.g., PostgreSQL, Redis, DynamoDB)
+- Modify `add_event()`, `get_events()`, `delete_event()`, `set_recurrence()` to use DB operations
+- For Vercel, consider AWS DynamoDB or a managed database service
 
 ## Development & Contributing
 
@@ -142,103 +203,20 @@ Contributions should follow the branch-per-feature workflow and include clear co
 
 ## Editing & Customization
 
-- **Buttons (UI)**: edit the sign-in buttons in [public/index.html](public/index.html#L1). The two buttons are `#signinGoogle` and `#signinMicrosoft` inside the header's `.auth-controls` element. Change label text or classes there.
+### Theme, Colors & Avatars
 
-- **Button behavior (client-side)**: modify the click handlers and simulated responses in [public/script.js](public/script.js#L1). The `testSignIn(provider)` function (or `startOauth(provider)` if you restore OAuth) controls what happens on click. To restore real OAuth, wire the handlers to `startOauth('google')` / `startOauth('microsoft')`.
+- **Theme / colors**: color variables live at the top of [public/style.css](public/style.css#L1). Change `--bg`, `--panel-bg`, `--text`, `--accent`, and `--send` to tune the palette.
+- **Avatars**: avatar styles are in [public/style.css](public/style.css#L1) under `.message .avatar`. User avatar is 🌞, bot avatar is ⭐. Edit `color`, `background`, or `border-radius` to customize.
 
-- **Redirect pages**: the small landing pages are [public/redirect_google.html](public/redirect_google.html) and [public/redirect_microsoft.html](public/redirect_microsoft.html). They perform a 1s meta-refresh to the external site; edit the copy or destination URL inside these files if desired.
+### Buttons (UI)
 
-- **Theme / colors**: color variables live at the top of [public/style.css](public/style.css#L1). Change `--bg`, `--panel-bg`, `--text`, `--accent`, and `--send` to tune the palette. The default theme is set in [public/script.js](public/script.js#L1) (`loadTheme()` uses localStorage key `ui_theme`). To default to dark again, set the default in `loadTheme()`.
+- **Sign-in / Connect buttons**: in [public/index.html](public/index.html#L1), the header contains authentication buttons:
+  - `#signinGoogle` and `#signinMicrosoft` (currently test buttons)
+  - Change label text or classes directly in HTML
+  - To restore real OAuth, change click handlers in [public/script.js](public/script.js) to call `startOauth(provider)`
 
-- **Avatars & icons**: avatar styles are in [public/style.css](public/style.css#L1) under `.message .avatar`. Update `color`, `background`, or border-radius to change their appearance. Emoji avatars are rendered as text; set `color` for contrast.
+### Redirect Pages (OAuth Fallback)
 
-- **Backend tools**: server-side MCP tools live in `api/mcp.py` and the message handler is available as the `handle_message` tool. If you add new UI controls that call backend tools, ensure the POST body matches the MCP shape used by the frontend (`{ tool: 'tool_name', input: { ... } }`).
-
-- **Local testing**: run the quick test harness:
-
-```bash
-python -m pip install -r requirements.txt
-python test_local.py
-# then open http://localhost:3000 (or the printed URL)
-```
-
-- **Committing & pushing**: recommended commit pattern:
-
-```bash
-git checkout -b feat/your-feature
-git add <files>
-git commit -m "feat: brief description"
-git push origin HEAD:copilot/integrate-oauth-email-login
-```
-
-- **Restoring OAuth**: if you want to re-enable OAuth flows, revert the test handlers in `public/script.js` to call `startOauth(provider)` and re-enable server-side OAuth code in `oauth_manager.py` and any `api/oauth_*.py` callbacks. Also update provider redirect URIs in your OAuth provider console to point at your deployed callback endpoints (e.g., `/api/oauth_google`).
-
-These notes give a quick map to the most commonly-edited parts of the app. If you want, I can add a short `DEVELOPING.md` with the same content and a small checklist for PRs.
-
-## Exact Locations
-
-For quick editing, here are the exact file locations and line ranges for common edits:
-
-- Sign-in buttons: [public/index.html](public/index.html#L23-L24)
-- Client handlers and helpers: [public/script.js](public/script.js#L148-L199) (`startOauth` at [public/script.js](public/script.js#L152), `testSignIn` at [public/script.js](public/script.js#L181-L196), `loadTheme` at [public/script.js](public/script.js#L60-L63))
-- Message rendering & helpers: `renderMessage` at [public/script.js](public/script.js#L75-L92), `addLocalMessage` at [public/script.js](public/script.js#L94-L99)
-- Theme variables (palette): [public/style.css](public/style.css#L8-L20)
-- Sign-in button styles: [public/style.css](public/style.css#L45-L49)
-- Avatar styles: [public/style.css](public/style.css#L54-L58)
-- Redirect pages: [public/redirect_google.html](public/redirect_google.html#L5) and [public/redirect_microsoft.html](public/redirect_microsoft.html#L5)
-
-Use these links when making small edits; they point directly to the relevant lines in the workspace.
-
-### Natural-language examples shown in the UI
-
-The chat UI displays example inputs to help users. You can edit these exact lines in the UI files below:
-
-- Welcome/warmup message (shown as the first bot message): [public/script.js](public/script.js) — look for the `addLocalMessage(...)` call that contains the welcome text.
-- Bottom help line (short examples shown under the composer): [public/index.html](public/index.html) — edit the `p.help` paragraph.
-
-Current example strings (copy/paste into tests or README):
-
- - "Add Birthday on 2026-02-01"
- - "Add Meeting March 5 about planning"
- - "Add Lunch tomorrow"
- - Shorthand: `add:Title|YYYY-MM-DD|Desc`
-
-Edit those files to change wording, add more samples, or localize the text.
-
-## Editing Test Sign-in Buttons
-
-These buttons in the UI are currently wired as local test buttons (they do not perform OAuth). To edit them or change their behavior:
-
-- File: [public/index.html](public/index.html#L1)
-  - Buttons: `#signinGoogle` and `#signinMicrosoft` are in the header under `.auth-controls`.
-  - Change the button label or markup directly in this file.
-
-- File: [public/script.js](public/script.js#L1)
-  - Test handler: `testSignIn(provider)` simulates a sign-in. Edit or replace this function to change test behavior.
-  - To restore real OAuth behavior, replace the click handlers with the `startOauth(provider)` calls:
-
-```js
-// example: restore OAuth start
-document.getElementById('signinGoogle').addEventListener('click', () => startOauth('google'));
-document.getElementById('signinMicrosoft').addEventListener('click', () => startOauth('microsoft'));
-```
-
-- Quick test locally:
-
-```bash
-# start the local test harness
-python -m pip install -r requirements.txt
-python test_local.py
-
-# open the app at http://localhost:3000 (or the port printed by the harness)
-```
-
-- Commit & push changes:
-
-```bash
-git add public/index.html public/script.js README.md
-git commit -m "chore: add test sign-in buttons and docs"
-git push origin HEAD:copilot/integrate-oauth-email-login
-```
-
-These notes keep the UI test-friendly and make it easy to rewire the buttons for a real OAuth flow later.
+- **Microsoft redirect**: [public/redirect_microsoft.html](public/redirect_microsoft.html) — dev fallback when OAuth is not configured
+- **Google redirect**: [public/redirect_google.html](public/redirect_google.html) — similar fallback
+- Edit the URL or meta-refresh delay as needed

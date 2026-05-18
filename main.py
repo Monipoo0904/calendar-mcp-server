@@ -12,10 +12,17 @@ from fastapi.staticfiles import StaticFiles
 #   as static files for the frontend. Events are stored in-memory (the `events` list).
 # - To add a new tool: add a function decorated with `@mcp.tool()` returning a string
 #   or serializable dict. Use `mcp.call_tool()` to invoke tools programmatically.
+# - RAG tools (search_knowledge_base, ask_knowledge_base):
+#   - Knowledge base lives in data/knowledge_base.json (array of {id, title, source, content}).
+#   - Retrieval uses pure-Python TF-IDF cosine similarity — no external vector store needed.
+#   - ask_knowledge_base calls the LLM (via LLM_API_KEY / OpenRouter) to synthesize an
+#     answer from retrieved chunks; falls back to a formatted excerpt when no key is set.
 # -----------------------------------------
 
 import os
 import json
+import math
+import re as _re
 import httpx
 import secrets
 from urllib.parse import urlencode
@@ -983,6 +990,23 @@ def handle_message(message: str) -> str:
   if any(k in low for k in planning_keywords):
     return "What would you like to accomplish? (Describe your goal and I'll help you plan it out.)"
 
+  # RAG — route knowledge base questions
+  rag_triggers = (
+    "what is", "how does", "how do", "tell me about", "explain",
+    "who can", "when does", "where is", "where are", "how many",
+    "what are", "describe", "information about", "info on",
+    "knowledge base", "ask", "search", "lookup", "look up",
+  )
+  if any(low.startswith(t) or t in low for t in rag_triggers):
+    answer = ask_knowledge_base(query=msg)
+    if isinstance(answer, dict) and answer.get("answer"):
+      lines = [answer["answer"]]
+      if answer.get("sources"):
+        lines.append("\n**Sources:**")
+        for s in answer["sources"]:
+          lines.append(f"- {s['title']} ({s['source']})")
+      return "\n".join(lines)
+
   # Fallback help text (should rarely hit)
   return (
     "Sorry, I didn't understand. Try commands like:\n"
@@ -991,10 +1015,226 @@ def handle_message(message: str) -> str:
     "- \"Summarize upcoming\"\n"
     "- \"Delete Birthday\"\n"
     "- \"Plan\" to start project planning\n"
+    "- \"What is MyVillage Project?\" to search the knowledge base\n"
   )
 
 
 
+
+
+
+# =============================================================================
+# RAG: Knowledge Base Retrieval Tools
+# =============================================================================
+# Pure-Python TF-IDF retriever — no vector DB, no heavy dependencies.
+# Docs are loaded from data/knowledge_base.json at startup (in-memory).
+# For a production system you'd swap this for pgvector / Pinecone / Weaviate,
+# but this is intentionally minimal for the demo deployment on Vercel.
+
+def _load_knowledge_base() -> List[Dict]:
+  """Load knowledge base docs from data/knowledge_base.json."""
+  kb_path = os.path.join(os.path.dirname(__file__), "data", "knowledge_base.json")
+  if not os.path.exists(kb_path):
+    return []
+  try:
+    with open(kb_path, "r", encoding="utf-8") as f:
+      docs = json.load(f)
+    return [d for d in docs if isinstance(d, dict) and d.get("content")]
+  except Exception:
+    return []
+
+# Preload at module import time so cold starts don't hit disk on every request.
+_KB_DOCS: List[Dict] = _load_knowledge_base()
+
+def _tokenize(text: str) -> List[str]:
+  """Lowercase, strip punctuation, split into tokens."""
+  return _re.findall(r"[a-z0-9]+", text.lower())
+
+def _compute_tf(tokens: List[str]) -> Dict[str, float]:
+  if not tokens:
+    return {}
+  freq: Dict[str, int] = {}
+  for t in tokens:
+    freq[t] = freq.get(t, 0) + 1
+  n = len(tokens)
+  return {t: c / n for t, c in freq.items()}
+
+def _build_idf(docs: List[List[str]]) -> Dict[str, float]:
+  """Compute IDF across all documents."""
+  n = len(docs)
+  df: Dict[str, int] = {}
+  for doc_tokens in docs:
+    for term in set(doc_tokens):
+      df[term] = df.get(term, 0) + 1
+  return {term: math.log((n + 1) / (count + 1)) + 1 for term, count in df.items()}
+
+def _tfidf_vector(tf: Dict[str, float], idf: Dict[str, float]) -> Dict[str, float]:
+  return {term: tf_val * idf.get(term, 1.0) for term, tf_val in tf.items()}
+
+def _cosine_sim(a: Dict[str, float], b: Dict[str, float]) -> float:
+  common = set(a) & set(b)
+  if not common:
+    return 0.0
+  dot = sum(a[t] * b[t] for t in common)
+  mag_a = math.sqrt(sum(v * v for v in a.values()))
+  mag_b = math.sqrt(sum(v * v for v in b.values()))
+  if mag_a == 0 or mag_b == 0:
+    return 0.0
+  return dot / (mag_a * mag_b)
+
+def _retrieve_chunks(query: str, top_k: int = 3) -> List[Dict]:
+  """Return the top_k most relevant KB docs for the given query."""
+  docs = _KB_DOCS
+  if not docs:
+    return []
+
+  all_tokens = [_tokenize(d["title"] + " " + d["content"]) for d in docs]
+  idf = _build_idf(all_tokens)
+
+  query_tokens = _tokenize(query)
+  query_tf = _compute_tf(query_tokens)
+  query_vec = _tfidf_vector(query_tf, idf)
+
+  scored = []
+  for i, doc in enumerate(docs):
+    doc_tf = _compute_tf(all_tokens[i])
+    doc_vec = _tfidf_vector(doc_tf, idf)
+    score = _cosine_sim(query_vec, doc_vec)
+    scored.append((score, doc))
+
+  scored.sort(key=lambda x: -x[0])
+  return [doc for score, doc in scored[:top_k] if score > 0]
+
+
+@mcp.tool()
+def search_knowledge_base(query: str, top_k: int = 3) -> dict:
+  """Search the MyVillage Project knowledge base and return relevant document chunks.
+
+  Uses TF-IDF cosine similarity to rank documents by relevance to the query.
+  Returns up to top_k chunks with their titles and source references.
+
+  Arguments:
+  - query: the search question or topic
+  - top_k: number of chunks to return (1–5, default 3)
+  """
+  top_k = max(1, min(int(top_k), 5))
+  chunks = _retrieve_chunks(query, top_k=top_k)
+
+  if not chunks:
+    return {
+      "query": query,
+      "results": [],
+      "message": "No relevant documents found in the knowledge base.",
+    }
+
+  results = [
+    {
+      "id": doc.get("id", ""),
+      "title": doc.get("title", ""),
+      "source": doc.get("source", ""),
+      "excerpt": doc["content"][:400] + ("..." if len(doc["content"]) > 400 else ""),
+    }
+    for doc in chunks
+  ]
+
+  return {
+    "query": query,
+    "results": results,
+    "count": len(results),
+  }
+
+
+@mcp.tool()
+def ask_knowledge_base(query: str, top_k: int = 3) -> dict:
+  """Answer a question using Retrieval-Augmented Generation (RAG).
+
+  Retrieves the most relevant knowledge base chunks, then passes them to the
+  LLM (via LLM_API_KEY / OpenRouter) to synthesize a grounded answer.
+  Falls back to a formatted excerpt summary when no LLM key is configured.
+
+  Sources are always included in the response so the answer can be verified.
+
+  Arguments:
+  - query: the question to answer
+  - top_k: number of context chunks to retrieve (default 3)
+  """
+  top_k = max(1, min(int(top_k), 5))
+  chunks = _retrieve_chunks(query, top_k=top_k)
+
+  if not chunks:
+    return {
+      "query": query,
+      "answer": "I couldn't find relevant information in the knowledge base for that question.",
+      "sources": [],
+    }
+
+  sources = [
+    {"title": doc.get("title", ""), "source": doc.get("source", "")}
+    for doc in chunks
+  ]
+
+  # Build context string for the LLM
+  context_parts = []
+  for i, doc in enumerate(chunks, start=1):
+    context_parts.append(f"[{i}] {doc.get('title', '')} ({doc.get('source', '')})\n{doc['content']}")
+  context = "\n\n---\n\n".join(context_parts)
+
+  llm_key = os.getenv("LLM_API_KEY")
+  if llm_key:
+    prompt = (
+      "You are a helpful assistant for the MyVillage Project educational program. "
+      "Use ONLY the context documents below to answer the question. "
+      "Be concise and accurate. If the context does not contain enough information to fully answer, "
+      "say so rather than guessing.\n\n"
+      f"Context:\n{context}\n\n"
+      f"Question: {query}\n\n"
+      "Answer:"
+    )
+    try:
+      model = os.getenv("OPENROUTER_MODEL", "google/gemini-flash-1.5")
+      resp = httpx.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        json={
+          "model": model,
+          "messages": [
+            {"role": "system", "content": "You answer questions using only the provided context."},
+            {"role": "user", "content": prompt},
+          ],
+          "temperature": 0.2,
+          "max_tokens": 400,
+        },
+        headers={
+          "Authorization": f"Bearer {llm_key}",
+          "Content-Type": "application/json",
+        },
+        timeout=20.0,
+      )
+      if resp.status_code == 200:
+        answer_text = (
+          resp.json()
+          .get("choices", [{}])[0]
+          .get("message", {})
+          .get("content", "")
+          .strip()
+        )
+        if answer_text:
+          return {"query": query, "answer": answer_text, "sources": sources, "rag": True}
+    except Exception:
+      pass  # fall through to excerpt fallback
+
+  # No LLM key or LLM call failed — return the best excerpt directly
+  best = chunks[0]
+  answer = (
+    f"{best.get('title', 'Knowledge Base')}: "
+    f"{best['content'][:500]}{'...' if len(best['content']) > 500 else ''}"
+  )
+  return {
+    "query": query,
+    "answer": answer,
+    "sources": sources,
+    "rag": False,
+    "note": "Set LLM_API_KEY to enable synthesized answers.",
+  }
 
 
 # FastAPI endpoint for MCP tool calls

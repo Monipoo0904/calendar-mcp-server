@@ -1,0 +1,68 @@
+[
+  {
+    "id": "prog-overview",
+    "title": "MyVillage Project — Program Overview",
+    "source": "Program Guide, Section 1",
+    "content": "MyVillage Project (MVP) is an after-school and weekend enrichment program serving K-12 students in under-resourced communities. Founded in 2019, MVP pairs trained near-peer tutors with students for strengths-based, project-driven learning. Rather than drilling deficits, coaches identify each student's top skills — whether that's storytelling, design, coding, or math — and build lesson plans that lead with those strengths. The program runs 10-week cohorts three times per year (Fall, Spring, and Summer). Each cohort includes weekly 90-minute sessions, monthly skill showcases, and an end-of-cohort capstone presentation open to families."
+  },
+  {
+    "id": "enrollment-process",
+    "title": "Enrollment and Onboarding",
+    "source": "Program Guide, Section 2",
+    "content": "Families can enroll students online at myvillageproject.org/enroll or in person at any MVP site. Enrollment opens 3 weeks before each cohort begins. Required documents include a completed application form, a copy of the student's most recent report card, and a signed family agreement. There is no cost to families — MVP is fully grant-funded. After enrollment, each student completes a 20-minute skills assessment administered by a lead coach. Assessment results are entered into the student skills database (accessible via the n8n webhook integration) and used to assign the student to a coaching team and to generate their first personalized lesson plan."
+  },
+  {
+    "id": "coaching-model",
+    "title": "The MVP Coaching Model",
+    "source": "Coaching Handbook, Chapter 1",
+    "content": "MVP coaches are trained in strengths-based facilitation. Every session begins with a check-in (what's one thing going well?) and ends with a reflection (what did you build or learn today?). Coaches use the student's recorded strengths — drawn from the skills database — to design activities that feel immediately relevant and achievable. When a student struggles, coaches are trained to reframe the challenge as a skills puzzle: which of the student's existing strengths can unlock this new concept? Coaches are not expected to tutor every subject; they are facilitators who help students apply their own capabilities to new problems."
+  },
+  {
+    "id": "skills-database",
+    "title": "Student Skills Database and Check-In System",
+    "source": "Tech Infrastructure Guide",
+    "content": "Student skill records are stored in a Google Sheet that syncs to an n8n workflow via a webhook endpoint. Each row represents one check-in event for one student and includes: row number, first name, last name, check-in date, and skill demonstrated. The AI planning assistant queries this webhook in real time to build a strength index — grouping all check-ins per student, ranking skills by frequency, and surfacing the top three strengths. This data powers the personalized lesson plan generator and the calendar milestone export feature. Coaches update the sheet directly after each session; no additional tools are required."
+  },
+  {
+    "id": "rag-and-ai",
+    "title": "AI-Powered Planning Assistant",
+    "source": "Tech Infrastructure Guide",
+    "content": "The MVP Calendar Workspace uses a Retrieval-Augmented Generation (RAG) architecture. When a coach or administrator asks a question, the assistant first searches a curated knowledge base to retrieve the most relevant program documents, policies, or student records. It then passes those retrieved chunks — along with the original question — to a language model (currently Google Gemini via OpenRouter) to synthesize a grounded, accurate answer. This approach means the assistant only answers from verified program documentation, reducing the risk of hallucinated responses. Sources are always cited so coaches can verify any answer against the original document."
+  },
+  {
+    "id": "calendar-export",
+    "title": "Calendar Invites and .ics Export",
+    "source": "Program Guide, Section 4",
+    "content": "Coaches and program managers can export lesson milestones as .ics calendar files directly from the Calendar Workspace. Each milestone becomes a separate calendar invite with the student's name, session title, and objective in the event description. Exports can be scoped to: all program events, a selected student's milestones only, or a group of students. The .ics format is compatible with Google Calendar, Apple Calendar, Outlook, and any calendar app that supports the iCalendar standard. Microsoft Calendar can also be connected directly via OAuth to push events automatically without downloading a file."
+  },
+  {
+    "id": "coach-expectations",
+    "title": "Coach Responsibilities and Expectations",
+    "source": "Coaching Handbook, Chapter 2",
+    "content": "MVP coaches are expected to attend all scheduled sessions for their assigned students, update the skill check-in sheet within 24 hours of each session, and complete the monthly reflections survey. Coaches who need to miss a session must notify the site coordinator at least 48 hours in advance and arrange a substitute. Each coach is assigned between 3 and 6 students per cohort. Lead coaches oversee a team of 4 peer coaches and are responsible for reviewing lesson plans before the start of each week. All coaches must complete the 6-hour MVP Training Certificate before their first session."
+  },
+  {
+    "id": "capstone-projects",
+    "title": "Capstone Project Requirements",
+    "source": "Program Guide, Section 5",
+    "content": "Every cohort concludes with a student capstone project. Students choose their own project topic in week 6, guided by their coach. Projects must demonstrate at least one of the student's recorded top strengths and must be presentable to a non-technical audience (family members, community partners). Past capstone formats have included short films, product prototypes, original research posters, coding projects, community service campaigns, and business pitches. Capstone presentations are held on the final Saturday of the cohort from 2pm to 5pm at the site. Families receive invitations four weeks before the event."
+  },
+  {
+    "id": "data-privacy",
+    "title": "Student Data Privacy and FERPA Compliance",
+    "source": "Policy Manual, Section 3",
+    "content": "MyVillage Project handles student records in compliance with FERPA and applicable state student privacy laws. Student names, skill records, and attendance data are stored in systems accessible only to credentialed MVP staff and coaches assigned to that student. No student data is shared with third parties without written family consent. The AI planning assistant accesses the skills database only to generate lesson plans and calendar exports — it does not store student data beyond the session. Family portal access allows parents and guardians to view their child's skill progress, session notes, and upcoming calendar events."
+  },
+  {
+    "id": "site-locations",
+    "title": "Program Sites and Locations",
+    "source": "Program Guide, Section 1",
+    "content": "MVP currently operates at five sites: Eastside Community Center (downtown), Riverside Library (Riverside neighborhood), Northgate Recreation Center, Southpark Middle School (partnership program), and a fully virtual site for students who cannot attend in person. Each site serves 20–40 students per cohort. The virtual site uses the same curriculum and check-in system but sessions are conducted over video call. Site coordinators are full-time MVP staff responsible for coach scheduling, student communication, and facility logistics."
+  },
+  {
+    "id": "outcomes",
+    "title": "Program Outcomes and Impact Data",
+    "source": "2024 Impact Report",
+    "content": "In the 2023-2024 program year, MVP served 312 students across 5 sites and 3 cohorts. Post-cohort surveys showed that 87% of students reported feeling more confident in at least one academic skill, 79% of families said their child's engagement with school improved, and 91% of coaches said the strengths-based model made their sessions more effective than traditional tutoring. Average session attendance rate was 84%. Of the 94 students who completed a capstone project, 76% presented to a live audience of family and community members. MVP was awarded a 3-year, $1.2M grant from the Regional Education Foundation in September 2024 to expand to two additional sites."
+  }
+]

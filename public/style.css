@@ -483,6 +483,71 @@ body {
   color: var(--muted);
 }
 
+/* RAG — Knowledge Base response styles */
+.rag-answer {
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.rag-sources {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0,0,0,0.08);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.rag-sources-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+.rag-source-chip {
+  display: inline-flex;
+  flex-direction: column;
+  background: rgba(38, 66, 38, 0.06);
+  border: 1px solid rgba(38, 66, 38, 0.15);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.76rem;
+}
+
+.rag-source-chip .chip-title {
+  font-weight: 600;
+  color: var(--text, #071429);
+}
+
+.rag-source-chip .chip-source {
+  color: var(--muted);
+  font-size: 0.70rem;
+}
+
+.rag-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  background: linear-gradient(135deg, #264226 0%, #1a2f1d 100%);
+  border-radius: 4px;
+  padding: 2px 7px;
+  margin-bottom: 6px;
+}
+
+/* Knowledge base path card highlight */
+.path-card--rag {
+  border-color: rgba(38, 66, 38, 0.35);
+  background: linear-gradient(135deg, rgba(38, 66, 38, 0.04) 0%, transparent 100%);
+}
+
 .dots {
   display: flex;
   gap: 6px;
