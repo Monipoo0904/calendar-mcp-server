@@ -1270,11 +1270,13 @@ form.addEventListener('submit', async (e) => {
   try {
     if (looksLikeStudentPlanRequest(text)) {
       await selectStudentsAndGeneratePlans(text);
+      maybeLogParentInquiry(text);
       return;
     }
 
     if (looksLikeKnowledgeBaseQuery(text)) {
       await submitKnowledgeBaseQuery(text);
+      maybeLogParentInquiry(text);
       return;
     }
 
@@ -1292,6 +1294,7 @@ form.addEventListener('submit', async (e) => {
     } else {
       addLocalMessage(`Error (${res.status}): ` + (data?.error || rawText || JSON.stringify(data)), 'bot');
     }
+    maybeLogParentInquiry(text);
   } catch (err) {
     removeTyping();
     addLocalMessage('Network error: ' + err.message, 'bot');
@@ -1299,6 +1302,32 @@ form.addEventListener('submit', async (e) => {
     setFetching(false);
   }
 });
+
+// ── GHL / CRM parent-inquiry handoff ─────
+async function maybeLogParentInquiry(userText) {
+  if (!/\bparent\b/i.test(userText)) return;
+  // Extract a name from the message (first capitalized word sequence)
+  const nameMatch = userText.match(/\b([A-Z][a-z]+(?: [A-Z][a-z]+)?)\b/);
+  const name = nameMatch ? nameMatch[1] : 'Student';
+  try {
+    await fetch('/api/ghl/lead', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, note: userText }),
+    });
+  } catch { /* silent — CRM is non-blocking */ }
+  // Inject CRM confirmation bubble
+  const el = document.createElement('div');
+  el.className = 'message bot';
+  el.innerHTML = `
+    ${_BOT_AV}
+    <div class="bubble">
+      <div class="text"><span class="ghl-badge">CRM ✓</span> Lead sent to GoHighLevel — parent inquiry logged for <strong>${escapeHtml(name)}</strong>.</div>
+    </div>
+  `;
+  messages.appendChild(el);
+  messages.scrollTop = messages.scrollHeight;
+}
 
 // helper: render a recurrence prompt below the last bot message
 function showRecurrencePrompt(title){

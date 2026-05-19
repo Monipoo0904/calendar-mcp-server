@@ -23,6 +23,7 @@ import os
 import json
 import math
 import re as _re
+from rag.retriever import retrieve_chunks as _rag_retrieve_chunks
 import httpx
 import secrets
 from urllib.parse import urlencode
@@ -88,6 +89,9 @@ _DEMO_STUDENT_ROWS = [
   {"first name": "Drew",    "last name": "Martinez", "check-in": "2026-05-10", "skill": "organization"},
   {"first name": "Drew",    "last name": "Martinez", "check-in": "2026-05-03", "skill": "planning"},
   {"first name": "Drew",    "last name": "Martinez", "check-in": "2026-04-26", "skill": "leadership"},
+  {"first name": "Maria",   "last name": "Santos",   "check-in": "2026-05-10", "skill": "reading comprehension"},
+  {"first name": "Maria",   "last name": "Santos",   "check-in": "2026-05-03", "skill": "phonics"},
+  {"first name": "Maria",   "last name": "Santos",   "check-in": "2026-04-26", "skill": "storytelling"},
 ]
 
 
@@ -653,9 +657,13 @@ def add_event(title: str, date: str, description: str = "", end: str = None) -> 
         pass
 
     events.append(ev)
+    # Calculate a follow-up due date (7 days after the session)
+    from datetime import timedelta
+    due_dt = dt + timedelta(days=7)
+    due_str = due_dt.strftime("%Y-%m-%d")
     if ev.get('end'):
-      return f"Event '{title}' added for {stored} until {ev.get('end')}."
-    return f"Event '{title}' added for {stored}." 
+      return f"Session '{title}' scheduled for {stored} until {ev.get('end')}. Due date: {due_str}."
+    return f"Session '{title}' scheduled for {stored}. Due date: {due_str}." 
   except ValueError: 
     return "Invalid date format. Use YYYY-MM-DD or include time like 'YYYY-MM-DD 14:30'." 
 # View all events 
@@ -1117,27 +1125,8 @@ def _cosine_sim(a: Dict[str, float], b: Dict[str, float]) -> float:
   return dot / (mag_a * mag_b)
 
 def _retrieve_chunks(query: str, top_k: int = 3) -> List[Dict]:
-  """Return the top_k most relevant KB docs for the given query."""
-  docs = _KB_DOCS
-  if not docs:
-    return []
-
-  all_tokens = [_tokenize(d["title"] + " " + d["content"]) for d in docs]
-  idf = _build_idf(all_tokens)
-
-  query_tokens = _tokenize(query)
-  query_tf = _compute_tf(query_tokens)
-  query_vec = _tfidf_vector(query_tf, idf)
-
-  scored = []
-  for i, doc in enumerate(docs):
-    doc_tf = _compute_tf(all_tokens[i])
-    doc_vec = _tfidf_vector(doc_tf, idf)
-    score = _cosine_sim(query_vec, doc_vec)
-    scored.append((score, doc))
-
-  scored.sort(key=lambda x: -x[0])
-  return [doc for score, doc in scored[:top_k] if score > 0]
+  """Delegate to rag/retriever.py — TF-IDF cosine similarity over _KB_DOCS."""
+  return _rag_retrieve_chunks(query, _KB_DOCS, top_k=top_k)
 
 
 @mcp.tool()
@@ -1530,6 +1519,34 @@ async def upload_document(file: UploadFile = File(...)):
   }
   _KB_DOCS.append(doc)
   return {"ok": True, "title": doc["title"]}
+
+
+@app.post("/api/ghl/lead", include_in_schema=False)
+async def ghl_lead(request: Request):
+  """Mock GoHighLevel CRM handoff — logs a parent inquiry lead record.
+
+  In production this would fire a real webhook to GoHighLevel and create
+  a contact + opportunity record automatically.
+  """
+  try:
+    body = await request.json()
+  except Exception:
+    body = {}
+  name = str(body.get("name", "")).strip() or "Student"
+  note = str(body.get("note", "")).strip()
+  # In production: POST to GHL webhook with contact details.
+  # For the demo we return a mock success response.
+  return {
+    "ok": True,
+    "crm": "GoHighLevel",
+    "action": "lead_created",
+    "contact_name": name,
+    "note": note or "Parent inquiry logged",
+    "message": f"Lead created for {name} — parent inquiry sent to GoHighLevel ✓",
+  }
+
+
+@app.get("/export.ics", include_in_schema=False)
 async def export_ics(request: Request):
   """Generate a simple iCalendar (.ics) file from in-memory `events`.
 
